@@ -1,9 +1,4 @@
-PySide6>=6.5.0
-openai-whisper
-torch
-imageio-ffmpeg
-hazm
-rapidfuzz
-wordfreq
-arabic-reshaper
-python-bidi
+pip install openai-whisper PySide6 arabic-reshaper python-bidi
+pip install numpy regex tqdm
+pip install persian-tools
+pip install soundfile
