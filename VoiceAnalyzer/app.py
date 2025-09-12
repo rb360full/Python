@@ -1,138 +1,152 @@
-import whisper
-import re
+import os
 import json
+import threading
 from collections import Counter
-from kivy.app import App
-from kivy.uix.boxlayout import BoxLayout
-from kivy.uix.button import Button
-from kivy.uix.label import Label
-from kivy.uix.filechooser import FileChooserIconView
-from kivy.uix.popup import Popup
-from kivy.uix.textinput import TextInput
-from kivy.uix.scrollview import ScrollView
+from tkinter import Tk
+from tkinter.filedialog import askopenfilename, asksaveasfilename
 
+from bidi.algorithm import get_display
+from kivy.clock import Clock
+from kivy.lang import Builder
+from kivy.core.text import LabelBase
+from kivymd.app import MDApp
+from kivymd.uix.screen import MDScreen
 
-class VoiceAnalyzerApp(App):
+import whisper
+import subprocess
+
+# مسیر پیش‌فرض ffmpeg در سیستم
+FFMPEG_PATH = r"C:\ffmpeg\bin"
+
+# ثبت فونت فارسی Vazir
+LabelBase.register(name="Vazir", fn_regular=os.path.join(os.path.dirname(__file__), "Vazir.ttf"))
+
+KV = """
+BoxLayout:
+    orientation: "vertical"
+    padding: 20
+    spacing: 20
+
+    MDLabel:
+        id: status_label
+        text: "Initializing..."
+        halign: "center"
+        font_name: "Vazir"
+        size_hint_y: None
+        height: self.texture_size[1]
+
+    MDRaisedButton:
+        text: "Choose Audio File"
+        pos_hint: {"center_x":0.5}
+        on_release: app.choose_audio_file()
+
+    MDRaisedButton:
+        text: "Save JSON Output"
+        pos_hint: {"center_x":0.5}
+        on_release: app.save_json_file()
+
+    MDLabel:
+        id: result_label
+        text: ""
+        halign: "center"
+        font_name: "Vazir"
+        size_hint_y: None
+        height: self.texture_size[1]
+"""
+
+class VoiceAnalyzer(MDScreen):
+    pass
+
+class VoiceApp(MDApp):
     def build(self):
-        self.title = "VoiceAnalyzer"  # اسم برنامه
-        self.model = whisper.load_model("small")  # مدل Whisper
-        self.analysis_result = {}  # ذخیره نتایج برای JSON
+        self.title = "VoiceAnalyzer"
+        self.theme_cls.theme_style = "Dark"
 
-        main_layout = BoxLayout(orientation="vertical", spacing=10, padding=10)
+        self.main_screen = Builder.load_string(KV)
+        self.model = None
+        self.data = {}
 
-        # برچسب راهنما
-        self.label = Label(text="🎤 یک فایل صوتی انتخاب کنید", font_size=20, color=(1, 1, 1, 1))
-        main_layout.add_widget(self.label)
+        # اضافه کردن ffmpeg به PATH
+        self.add_ffmpeg_to_path()
 
-        # انتخاب فایل صوتی
-        self.filechooser = FileChooserIconView(filters=["*.mp3", "*.wav", "*.m4a"])
-        main_layout.add_widget(self.filechooser)
+        # بارگذاری مدل در Thread
+        Clock.schedule_once(lambda dt: threading.Thread(target=self.load_model).start(), 0)
+        return self.main_screen
 
-        # دکمه‌ها
-        button_layout = BoxLayout(size_hint=(1, 0.15), spacing=10)
+    def add_ffmpeg_to_path(self):
+        if not self.is_ffmpeg_available():
+            os.environ["PATH"] += os.pathsep + FFMPEG_PATH
+            if not self.is_ffmpeg_available():
+                self.update_status("ffmpeg not found! Please install or adjust FFMPEG_PATH ⚠️")
 
-        self.analyze_button = Button(text="تحلیل وویس", background_color=(0.2, 0.2, 0.2, 1))
-        self.analyze_button.bind(on_press=self.analyze_voice)
-        button_layout.add_widget(self.analyze_button)
-
-        self.save_button = Button(text="ذخیره JSON", background_color=(0.1, 0.5, 0.1, 1))
-        self.save_button.bind(on_press=self.ask_save_path)
-        button_layout.add_widget(self.save_button)
-
-        main_layout.add_widget(button_layout)
-
-        # نمایش نتایج با ScrollView
-        self.result_label = Label(text="", font_size=16, color=(1, 1, 1, 1), halign="left", valign="top")
-        self.result_label.bind(size=self.result_label.setter('text_size'))
-
-        scroll = ScrollView(size_hint=(1, 0.5))
-        scroll.add_widget(self.result_label)
-        main_layout.add_widget(scroll)
-
-        # بک‌گراند دارک
-        main_layout.canvas.before.clear()
-        with main_layout.canvas.before:
-            from kivy.graphics import Color, Rectangle
-            Color(0.1, 0.1, 0.1, 1)
-            self.rect = Rectangle(size=main_layout.size, pos=main_layout.pos)
-            main_layout.bind(size=self._update_rect, pos=self._update_rect)
-
-        return main_layout
-
-    def _update_rect(self, instance, value):
-        self.rect.size = instance.size
-        self.rect.pos = instance.pos
-
-    def analyze_voice(self, instance):
-        if not self.filechooser.selection:
-            self.result_label.text = "⚠️ لطفاً یک فایل انتخاب کنید"
-            return
-
-        file_path = self.filechooser.selection[0]
-
-        # استخراج متن
-        result = self.model.transcribe(file_path, fp16=False)
-        text = result["text"].strip()
-
-        # جدا کردن کلمات
-        words = re.findall(r'\w+', text.lower(), re.UNICODE)
-        total_words = len(words)
-        word_freq = Counter(words)
-        top_words = word_freq.most_common(5)
-
-        # ذخیره نتایج برای JSON
-        self.analysis_result = {
-            "text": text,
-            "total_words": total_words,
-            "top_words": top_words
-        }
-
-        # نمایش در UI
-        output = f"📝 متن:\n{text}\n\n"
-        output += f"🔢 تعداد کل کلمات: {total_words}\n\n"
-        output += "🔥 کلمات پرتکرار:\n"
-        for word, count in top_words:
-            output += f"{word}: {count}\n"
-
-        self.result_label.text = output
-
-    def ask_save_path(self, instance):
-        if not self.analysis_result:
-            self.result_label.text = "⚠️ هنوز تحلیلی انجام نشده!"
-            return
-
-        # پاپ‌آپ برای انتخاب نام فایل
-        content = BoxLayout(orientation="vertical", spacing=10, padding=10)
-        text_input = TextInput(text="analysis_result.json", multiline=False)
-
-        btn_layout = BoxLayout(size_hint=(1, 0.3), spacing=10)
-        save_btn = Button(text="ذخیره", background_color=(0.1, 0.6, 0.1, 1))
-        cancel_btn = Button(text="لغو", background_color=(0.6, 0.1, 0.1, 1))
-
-        btn_layout.add_widget(save_btn)
-        btn_layout.add_widget(cancel_btn)
-
-        content.add_widget(Label(text="📁 نام فایل خروجی را وارد کنید:", color=(1, 1, 1, 1)))
-        content.add_widget(text_input)
-        content.add_widget(btn_layout)
-
-        popup = Popup(title="ذخیره JSON", content=content, size_hint=(0.8, 0.4))
-
-        save_btn.bind(on_press=lambda x: self.save_json(text_input.text, popup))
-        cancel_btn.bind(on_press=popup.dismiss)
-
-        popup.open()
-
-    def save_json(self, filename, popup):
+    def is_ffmpeg_available(self):
         try:
-            with open(filename, "w", encoding="utf-8") as f:
-                json.dump(self.analysis_result, f, ensure_ascii=False, indent=4)
+            subprocess.run(["ffmpeg", "-version"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            return True
+        except Exception:
+            return False
 
-            self.result_label.text += f"\n\n✅ خروجی در {filename} ذخیره شد."
-            popup.dismiss()
+    def load_model(self):
+        self.update_status("Loading Whisper model... Please wait")
+        try:
+            self.model = whisper.load_model("small")
+            self.update_status("Model ready ✅")
         except Exception as e:
-            self.result_label.text = f"❌ خطا در ذخیره فایل: {str(e)}"
+            self.update_status(f"Error loading model: {str(e)}")
 
+    def update_status(self, text):
+        self.main_screen.ids.status_label.text = text
+
+    def choose_audio_file(self):
+        Tk().withdraw()
+        filepath = askopenfilename(
+            title="Select Audio File",
+            filetypes=[("Audio files", "*.mp3 *.wav *.m4a *.ogg")]
+        )
+        if filepath:
+            self.update_status(f"Processing: {os.path.basename(filepath)}")
+            threading.Thread(target=self.process_audio, args=(filepath,)).start()
+
+    def save_json_file(self):
+        if not self.data:
+            self.update_status("No data to save ❌")
+            return
+        Tk().withdraw()
+        filepath = asksaveasfilename(
+            title="Save JSON Output",
+            defaultextension=".json",
+            filetypes=[("JSON files", "*.json")]
+        )
+        if filepath:
+            try:
+                with open(filepath, "w", encoding="utf-8") as f:
+                    json.dump(self.data, f, ensure_ascii=False, indent=4)
+                self.update_status(f"JSON saved: {filepath}")
+            except Exception as e:
+                self.update_status(f"Error saving JSON: {str(e)}")
+
+    def process_audio(self, filepath):
+        try:
+            result = self.model.transcribe(filepath)
+            text = result['text']
+            words = text.split()
+            word_count = len(words)
+            word_freq = dict(Counter(words).most_common(10))
+            self.data = {
+                "file": filepath,
+                "text": text,
+                "word_count": word_count,
+                "top_words": word_freq
+            }
+            display_text = get_display(f"Word count: {word_count}\nTop words: {word_freq}\n\n{text}")
+            Clock.schedule_once(lambda dt: self.update_result(display_text), 0)
+            Clock.schedule_once(lambda dt: self.update_status("Processing done ✅"), 0)
+        except Exception as e:
+            Clock.schedule_once(lambda dt: self.update_result(f"Error: {str(e)}"), 0)
+            Clock.schedule_once(lambda dt: self.update_status("Error occurred ❌"), 0)
+
+    def update_result(self, text):
+        self.main_screen.ids.result_label.text = text
 
 if __name__ == "__main__":
-    VoiceAnalyzerApp().run()
+    VoiceApp().run()
