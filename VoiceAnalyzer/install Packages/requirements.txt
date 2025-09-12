@@ -1,0 +1,15 @@
+# Core
+kivy>=2.3.0
+kivymd>=1.1.1
+
+# Audio processing
+SpeechRecognition>=3.10.0
+pydub>=0.25.1
+sounddevice>=0.5.0
+scipy>=1.13.0
+
+# Advanced STT (optional but recommended)
+openai-whisper>=20231117
+
+# JSON handling
+simplejson>=3.19.2
