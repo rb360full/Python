@@ -1,38 +1,52 @@
 import sys
 import os
+from pathlib import Path
 from PySide6.QtWidgets import (
     QApplication, QWidget, QPushButton, QVBoxLayout, QLabel, QFileDialog,
     QTextEdit, QScrollArea, QProgressBar
 )
 from PySide6.QtCore import Qt, QThread, Signal
-from pathlib import Path
+import subprocess
 import json
+
+# Whisper و تبدیل صوت به متن
 import whisper
 
-# ست کردن مسیر ffmpeg
-os.environ["IMAGEIO_FFMPEG_EXE"] = r"C:\ffmpeg\bin\ffmpeg.exe"
+# بررسی ffmpeg در PATH
+try:
+    subprocess.run(["ffmpeg", "-version"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+except FileNotFoundError:
+    raise RuntimeError("FFmpeg not found in PATH! Install it or add to PATH.")
 
-# مسیر فونت Vazir
-FONT_PATH = str(Path(__file__).parent / "Vazir.ttf")
+# مسیر دیکشنری کاستوم
+CUSTOM_DICT_FILE = Path("custom_dict.json")
+if not CUSTOM_DICT_FILE.exists():
+    with open(CUSTOM_DICT_FILE, "w", encoding="utf-8") as f:
+        json.dump({}, f, ensure_ascii=False, indent=2)
 
+# Worker thread برای پردازش
 class TranscribeThread(QThread):
-    progress = Signal(str)
+    progress = Signal(int)
     finished = Signal(str)
 
-    def __init__(self, file_path, model_name="medium"):
+    def __init__(self, audio_path):
         super().__init__()
-        self.file_path = file_path
-        self.model_name = model_name
+        self.audio_path = audio_path
+        self.model = whisper.load_model("medium")
 
     def run(self):
+        self.progress.emit(10)
         try:
-            self.progress.emit("Loading Whisper model...")
-            model = whisper.load_model(self.model_name)
-
-            self.progress.emit("Transcribing audio...")
-            result = model.transcribe(self.file_path)
+            result = self.model.transcribe(str(self.audio_path))
             text = result["text"]
 
+            # اعمال لغات کاستوم
+            with open(CUSTOM_DICT_FILE, encoding="utf-8") as f:
+                custom_dict = json.load(f)
+            for wrong, correct in custom_dict.items():
+                text = text.replace(wrong, correct)
+
+            self.progress.emit(100)
             self.finished.emit(text)
         except Exception as e:
             self.finished.emit(f"Error: {str(e)}")
@@ -42,40 +56,32 @@ class VoiceApp(QWidget):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Voice Analyzer")
-        self.setGeometry(100, 100, 700, 500)
+        self.resize(600, 400)
 
-        layout = QVBoxLayout()
+        self.layout = QVBoxLayout(self)
 
-        # دکمه انتخاب فایل
-        self.btn_select = QPushButton("Choose Audio File")
+        self.label = QLabel("Select an audio file:")
+        self.layout.addWidget(self.label)
+
+        self.btn_select = QPushButton("Choose File")
         self.btn_select.clicked.connect(self.select_file)
-        layout.addWidget(self.btn_select)
+        self.layout.addWidget(self.btn_select)
 
-        # برچسب وضعیت
-        self.status_label = QLabel("Status: Idle")
-        layout.addWidget(self.status_label)
+        self.progress = QProgressBar()
+        self.layout.addWidget(self.progress)
 
-        # پروگرس بار
-        self.progress_bar = QProgressBar()
-        self.progress_bar.setRange(0, 0)  # Indeterminate
-        self.progress_bar.setVisible(False)
-        layout.addWidget(self.progress_bar)
-
-        # TextEdit با اسکرول
+        self.scroll = QScrollArea()
         self.text_edit = QTextEdit()
         self.text_edit.setReadOnly(True)
-        self.text_edit.setFontPointSize(12)
-        layout.addWidget(self.text_edit)
+        self.scroll.setWidget(self.text_edit)
+        self.scroll.setWidgetResizable(True)
+        self.layout.addWidget(self.scroll)
 
-        # دکمه ذخیره JSON
-        self.btn_save = QPushButton("Save as JSON")
-        self.btn_save.clicked.connect(self.save_json)
-        self.btn_save.setEnabled(False)
-        layout.addWidget(self.btn_save)
+        self.btn_save = QPushButton("Save Text")
+        self.btn_save.clicked.connect(self.save_text)
+        self.layout.addWidget(self.btn_save)
 
-        self.setLayout(layout)
         self.audio_path = None
-        self.transcribed_text = ""
 
     def select_file(self):
         file_path, _ = QFileDialog.getOpenFileName(
@@ -83,39 +89,27 @@ class VoiceApp(QWidget):
         )
         if file_path:
             self.audio_path = file_path
+            self.label.setText(f"Selected: {file_path}")
             self.start_transcription()
 
     def start_transcription(self):
-        self.status_label.setText("Status: Processing...")
-        self.progress_bar.setVisible(True)
         self.text_edit.clear()
-        self.btn_save.setEnabled(False)
-
         self.thread = TranscribeThread(self.audio_path)
-        self.thread.progress.connect(self.update_status)
-        self.thread.finished.connect(self.transcription_finished)
+        self.thread.progress.connect(self.progress.setValue)
+        self.thread.finished.connect(self.display_result)
         self.thread.start()
 
-    def update_status(self, message):
-        self.status_label.setText(f"Status: {message}")
-
-    def transcription_finished(self, text):
-        self.progress_bar.setVisible(False)
-        self.transcribed_text = text
+    def display_result(self, text):
         self.text_edit.setPlainText(text)
-        self.status_label.setText("Status: Finished")
-        self.btn_save.setEnabled(True)
 
-    def save_json(self):
-        if not self.transcribed_text:
-            return
-        file_path, _ = QFileDialog.getSaveFileName(
-            self, "Save JSON", "", "JSON Files (*.json)"
-        )
-        if file_path:
-            with open(file_path, "w", encoding="utf-8") as f:
-                json.dump({"text": self.transcribed_text}, f, ensure_ascii=False)
-            self.status_label.setText(f"Status: Saved to {file_path}")
+    def save_text(self):
+        if self.text_edit.toPlainText():
+            save_path, _ = QFileDialog.getSaveFileName(
+                self, "Save Text", "", "Text Files (*.txt)"
+            )
+            if save_path:
+                with open(save_path, "w", encoding="utf-8") as f:
+                    f.write(self.text_edit.toPlainText())
 
 
 if __name__ == "__main__":
