@@ -1,15 +1,19 @@
-# Core
-kivy>=2.3.0
-kivymd>=1.1.1
+python -m pip install --upgrade pip
+pip install openai-whisper PySide6 arabic-reshaper python-bidi json5
+pip install imageio-ffmpeg
 
-# Audio processing
-SpeechRecognition>=3.10.0
-pydub>=0.25.1
-sounddevice>=0.5.0
-scipy>=1.13.0
+pip install openai-whisper PySide6 parsivar arabic-reshaper python-bidi
+ 
 
-# Advanced STT (optional but recommended)
-openai-whisper>=20231117
+PySide6
+openai-whisper
+arabic-reshaper
+python-bidi
 
-# JSON handling
-simplejson>=3.19.2
+
+PySide6==6.6.0
+whisper
+persian-tools
+tqdm
+torch
+numpy

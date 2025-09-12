@@ -1,152 +1,125 @@
+import sys
 import os
+from PySide6.QtWidgets import (
+    QApplication, QWidget, QPushButton, QVBoxLayout, QLabel, QFileDialog,
+    QTextEdit, QScrollArea, QProgressBar
+)
+from PySide6.QtCore import Qt, QThread, Signal
+from pathlib import Path
 import json
-import threading
-from collections import Counter
-from tkinter import Tk
-from tkinter.filedialog import askopenfilename, asksaveasfilename
-
-from bidi.algorithm import get_display
-from kivy.clock import Clock
-from kivy.lang import Builder
-from kivy.core.text import LabelBase
-from kivymd.app import MDApp
-from kivymd.uix.screen import MDScreen
-
 import whisper
-import subprocess
 
-# مسیر پیش‌فرض ffmpeg در سیستم
-FFMPEG_PATH = r"C:\ffmpeg\bin"
+# ست کردن مسیر ffmpeg
+os.environ["IMAGEIO_FFMPEG_EXE"] = r"C:\ffmpeg\bin\ffmpeg.exe"
 
-# ثبت فونت فارسی Vazir
-LabelBase.register(name="Vazir", fn_regular=os.path.join(os.path.dirname(__file__), "Vazir.ttf"))
+# مسیر فونت Vazir
+FONT_PATH = str(Path(__file__).parent / "Vazir.ttf")
 
-KV = """
-BoxLayout:
-    orientation: "vertical"
-    padding: 20
-    spacing: 20
+class TranscribeThread(QThread):
+    progress = Signal(str)
+    finished = Signal(str)
 
-    MDLabel:
-        id: status_label
-        text: "Initializing..."
-        halign: "center"
-        font_name: "Vazir"
-        size_hint_y: None
-        height: self.texture_size[1]
+    def __init__(self, file_path, model_name="medium"):
+        super().__init__()
+        self.file_path = file_path
+        self.model_name = model_name
 
-    MDRaisedButton:
-        text: "Choose Audio File"
-        pos_hint: {"center_x":0.5}
-        on_release: app.choose_audio_file()
-
-    MDRaisedButton:
-        text: "Save JSON Output"
-        pos_hint: {"center_x":0.5}
-        on_release: app.save_json_file()
-
-    MDLabel:
-        id: result_label
-        text: ""
-        halign: "center"
-        font_name: "Vazir"
-        size_hint_y: None
-        height: self.texture_size[1]
-"""
-
-class VoiceAnalyzer(MDScreen):
-    pass
-
-class VoiceApp(MDApp):
-    def build(self):
-        self.title = "VoiceAnalyzer"
-        self.theme_cls.theme_style = "Dark"
-
-        self.main_screen = Builder.load_string(KV)
-        self.model = None
-        self.data = {}
-
-        # اضافه کردن ffmpeg به PATH
-        self.add_ffmpeg_to_path()
-
-        # بارگذاری مدل در Thread
-        Clock.schedule_once(lambda dt: threading.Thread(target=self.load_model).start(), 0)
-        return self.main_screen
-
-    def add_ffmpeg_to_path(self):
-        if not self.is_ffmpeg_available():
-            os.environ["PATH"] += os.pathsep + FFMPEG_PATH
-            if not self.is_ffmpeg_available():
-                self.update_status("ffmpeg not found! Please install or adjust FFMPEG_PATH ⚠️")
-
-    def is_ffmpeg_available(self):
+    def run(self):
         try:
-            subprocess.run(["ffmpeg", "-version"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            return True
-        except Exception:
-            return False
+            self.progress.emit("Loading Whisper model...")
+            model = whisper.load_model(self.model_name)
 
-    def load_model(self):
-        self.update_status("Loading Whisper model... Please wait")
-        try:
-            self.model = whisper.load_model("small")
-            self.update_status("Model ready ✅")
+            self.progress.emit("Transcribing audio...")
+            result = model.transcribe(self.file_path)
+            text = result["text"]
+
+            self.finished.emit(text)
         except Exception as e:
-            self.update_status(f"Error loading model: {str(e)}")
+            self.finished.emit(f"Error: {str(e)}")
 
-    def update_status(self, text):
-        self.main_screen.ids.status_label.text = text
 
-    def choose_audio_file(self):
-        Tk().withdraw()
-        filepath = askopenfilename(
-            title="Select Audio File",
-            filetypes=[("Audio files", "*.mp3 *.wav *.m4a *.ogg")]
+class VoiceApp(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("Voice Analyzer")
+        self.setGeometry(100, 100, 700, 500)
+
+        layout = QVBoxLayout()
+
+        # دکمه انتخاب فایل
+        self.btn_select = QPushButton("Choose Audio File")
+        self.btn_select.clicked.connect(self.select_file)
+        layout.addWidget(self.btn_select)
+
+        # برچسب وضعیت
+        self.status_label = QLabel("Status: Idle")
+        layout.addWidget(self.status_label)
+
+        # پروگرس بار
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setRange(0, 0)  # Indeterminate
+        self.progress_bar.setVisible(False)
+        layout.addWidget(self.progress_bar)
+
+        # TextEdit با اسکرول
+        self.text_edit = QTextEdit()
+        self.text_edit.setReadOnly(True)
+        self.text_edit.setFontPointSize(12)
+        layout.addWidget(self.text_edit)
+
+        # دکمه ذخیره JSON
+        self.btn_save = QPushButton("Save as JSON")
+        self.btn_save.clicked.connect(self.save_json)
+        self.btn_save.setEnabled(False)
+        layout.addWidget(self.btn_save)
+
+        self.setLayout(layout)
+        self.audio_path = None
+        self.transcribed_text = ""
+
+    def select_file(self):
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, "Select Audio File", "", "Audio Files (*.mp3 *.wav *.m4a)"
         )
-        if filepath:
-            self.update_status(f"Processing: {os.path.basename(filepath)}")
-            threading.Thread(target=self.process_audio, args=(filepath,)).start()
+        if file_path:
+            self.audio_path = file_path
+            self.start_transcription()
 
-    def save_json_file(self):
-        if not self.data:
-            self.update_status("No data to save ❌")
+    def start_transcription(self):
+        self.status_label.setText("Status: Processing...")
+        self.progress_bar.setVisible(True)
+        self.text_edit.clear()
+        self.btn_save.setEnabled(False)
+
+        self.thread = TranscribeThread(self.audio_path)
+        self.thread.progress.connect(self.update_status)
+        self.thread.finished.connect(self.transcription_finished)
+        self.thread.start()
+
+    def update_status(self, message):
+        self.status_label.setText(f"Status: {message}")
+
+    def transcription_finished(self, text):
+        self.progress_bar.setVisible(False)
+        self.transcribed_text = text
+        self.text_edit.setPlainText(text)
+        self.status_label.setText("Status: Finished")
+        self.btn_save.setEnabled(True)
+
+    def save_json(self):
+        if not self.transcribed_text:
             return
-        Tk().withdraw()
-        filepath = asksaveasfilename(
-            title="Save JSON Output",
-            defaultextension=".json",
-            filetypes=[("JSON files", "*.json")]
+        file_path, _ = QFileDialog.getSaveFileName(
+            self, "Save JSON", "", "JSON Files (*.json)"
         )
-        if filepath:
-            try:
-                with open(filepath, "w", encoding="utf-8") as f:
-                    json.dump(self.data, f, ensure_ascii=False, indent=4)
-                self.update_status(f"JSON saved: {filepath}")
-            except Exception as e:
-                self.update_status(f"Error saving JSON: {str(e)}")
+        if file_path:
+            with open(file_path, "w", encoding="utf-8") as f:
+                json.dump({"text": self.transcribed_text}, f, ensure_ascii=False)
+            self.status_label.setText(f"Status: Saved to {file_path}")
 
-    def process_audio(self, filepath):
-        try:
-            result = self.model.transcribe(filepath)
-            text = result['text']
-            words = text.split()
-            word_count = len(words)
-            word_freq = dict(Counter(words).most_common(10))
-            self.data = {
-                "file": filepath,
-                "text": text,
-                "word_count": word_count,
-                "top_words": word_freq
-            }
-            display_text = get_display(f"Word count: {word_count}\nTop words: {word_freq}\n\n{text}")
-            Clock.schedule_once(lambda dt: self.update_result(display_text), 0)
-            Clock.schedule_once(lambda dt: self.update_status("Processing done ✅"), 0)
-        except Exception as e:
-            Clock.schedule_once(lambda dt: self.update_result(f"Error: {str(e)}"), 0)
-            Clock.schedule_once(lambda dt: self.update_status("Error occurred ❌"), 0)
-
-    def update_result(self, text):
-        self.main_screen.ids.result_label.text = text
 
 if __name__ == "__main__":
-    VoiceApp().run()
+    app = QApplication(sys.argv)
+    window = VoiceApp()
+    window.show()
+    sys.exit(app.exec())

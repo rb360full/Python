@@ -1,0 +1,9 @@
+PySide6>=6.5.0
+openai-whisper
+torch
+imageio-ffmpeg
+hazm
+rapidfuzz
+wordfreq
+arabic-reshaper
+python-bidi
