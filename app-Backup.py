@@ -10,8 +10,6 @@ import subprocess
 import json
 import collections
 import webbrowser
-import tempfile
-import time
 
 # Whisper و تبدیل صوت به متن
 import whisper
@@ -49,22 +47,10 @@ class TranscribeThread(QThread):
         self._stop = False
 
     def run(self):
+        self.progress.emit(10)
         try:
-            self.progress.emit(5)
-            # تبدیل به WAV 16kHz Mono در فایل موقت
-            with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
-                temp_wav = tmp.name
-
-            subprocess.run([
-                "ffmpeg", "-y", "-i", str(self.audio_path),
-                "-ar", "16000", "-ac", "1", temp_wav
-            ], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            self.progress.emit(30)
-
-            # تبدیل صوت به متن با مدل whisper
-            result = self.model.transcribe(temp_wav)
+            result = self.model.transcribe(str(self.audio_path))
             text = result["text"]
-            self.progress.emit(70)
 
             # لغات کاستوم
             with open(CUSTOM_DICT_FILE, encoding="utf-8") as f:
@@ -93,21 +79,18 @@ class TranscribeThread(QThread):
                 stats += f"{w}: {c}\n"
 
             text += stats
+
             self.progress.emit(100)
             self.finished.emit(text)
-
-            # حذف فایل موقت
-            os.remove(temp_wav)
-
         except Exception as e:
             self.finished.emit(f"Error: {str(e)}")
-
 
 class VoiceApp(QWidget):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Voice Analyzer")
-        self.resize(900, 600)  # بزرگ‌تر کردن سایز اپ
+        self.resize(700, 500)
+
         self.layout = QVBoxLayout(self)
 
         self.label = QLabel("Select an audio file:")
@@ -115,27 +98,22 @@ class VoiceApp(QWidget):
 
         # دکمه ها
         self.btn_select = QPushButton("Choose File")
-        self.btn_select.setMinimumHeight(40)
         self.btn_select.clicked.connect(self.select_file)
         self.layout.addWidget(self.btn_select)
 
-        self.btn_start_pause = QPushButton("Start / Pause")
-        self.btn_start_pause.setMinimumHeight(40)
+        self.btn_start_pause = QPushButton("Start/Pause")
         self.btn_start_pause.clicked.connect(self.toggle_start_pause)
         self.layout.addWidget(self.btn_start_pause)
 
         self.btn_stop = QPushButton("Stop")
-        self.btn_stop.setMinimumHeight(40)
         self.btn_stop.clicked.connect(self.stop_processing)
         self.layout.addWidget(self.btn_stop)
 
         self.btn_open_text = QPushButton("Open Text")
-        self.btn_open_text.setMinimumHeight(40)
         self.btn_open_text.clicked.connect(self.open_text_file)
         self.layout.addWidget(self.btn_open_text)
 
         self.btn_manage_dict = QPushButton("Manage Dictionary")
-        self.btn_manage_dict.setMinimumHeight(40)
         self.btn_manage_dict.clicked.connect(self.open_dict_manager)
         self.layout.addWidget(self.btn_manage_dict)
 
@@ -145,7 +123,6 @@ class VoiceApp(QWidget):
         self.scroll = QScrollArea()
         self.text_edit = QTextEdit()
         self.text_edit.setReadOnly(True)
-        self.text_edit.setFontPointSize(14)  # بزرگ‌تر شدن متن نمایشی
         self.scroll.setWidget(self.text_edit)
         self.scroll.setWidgetResizable(True)
         self.layout.addWidget(self.scroll)
@@ -155,17 +132,16 @@ class VoiceApp(QWidget):
         self.thread = None
         self.dict_manager_window = None
 
+    # فقط این قسمت اصلاح شد، حذف start_transcription خودکار
     def select_file(self):
         file_path, _ = QFileDialog.getOpenFileName(
-            self, "Select Audio File", "", 
-            "Audio Files (*.mp3 *.wav *.m4a *.ogg *.flac)"
+            self, "Select Audio File", "", "Audio Files (*.mp3 *.wav *.m4a)"
         )
         if file_path:
             self.audio_path = file_path
             self.label.setText(f"Selected: {file_path}")
             self.text_edit.clear()
             self.output_file = None
-            self.thread = None  # ریست کردن thread برای فایل جدید
 
     def start_transcription(self):
         if not self.audio_path:
@@ -201,9 +177,14 @@ class VoiceApp(QWidget):
             return
 
         if not self.thread:
-            self.start_transcription()
+            # ایجاد و شروع thread
+            self.thread = TranscribeThread(self.audio_path)
+            self.thread.progress.connect(self.progress.setValue)
+            self.thread.finished.connect(self.display_result)
+            self.thread.start()
         else:
-            QMessageBox.information(self, "Info", "Pause / Resume toggle clicked (future implementation).")
+            # برای آینده: Pause/Resume
+            QMessageBox.information(self, "Info", "Pause/Resume toggle clicked (future implementation).")
 
     def stop_processing(self):
         if self.thread and self.thread.isRunning():
@@ -215,7 +196,6 @@ class VoiceApp(QWidget):
         self.dict_manager_window.show()
         self.dict_manager_window.raise_()
         self.dict_manager_window.activateWindow()
-
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
