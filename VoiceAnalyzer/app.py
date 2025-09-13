@@ -16,14 +16,6 @@ import time
 # Whisper و تبدیل صوت به متن
 import whisper
 
-# تصحیح خودکار متن فارسی
-try:
-    from persiantools import characters
-    PERSIAN_TOOLS_AVAILABLE = True
-except ImportError:
-    PERSIAN_TOOLS_AVAILABLE = False
-    print("Warning: persiantools not installed. Install with: pip install persiantools")
-
 # بررسی ffmpeg در PATH
 try:
     subprocess.run(["ffmpeg", "-version"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -75,10 +67,7 @@ class TranscribeThread(QThread):
             result = self.model.transcribe(
                 temp_wav,
                 language="fa",  # زبان فارسی
-                initial_prompt="این یک فایل صوتی فارسی است. متن باید به صورت صحیح و بدون اشتباه تایپی نوشته شود.",
-                temperature=0.0,  # کاهش خلاقیت برای دقت بیشتر
-                best_of=3,  # تست 3 بار و انتخاب بهترین نتیجه
-                beam_size=5  # جستجوی بهتر برای کلمات
+                initial_prompt="این یک فایل صوتی فارسی است که باید به متن تبدیل شود."
             )
             text = result["text"]
             self.progress.emit(70)
