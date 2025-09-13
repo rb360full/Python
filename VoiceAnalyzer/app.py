@@ -16,6 +16,15 @@ import time
 # Whisper و تبدیل صوت به متن
 import whisper
 
+# تصحیح خودکار فارسی
+try:
+    from persiantools import digits
+    from persiantools import characters
+    PERSIAN_TOOLS_AVAILABLE = True
+except ImportError:
+    PERSIAN_TOOLS_AVAILABLE = False
+    print("Warning: persiantools not installed. Install with: pip install persiantools")
+
 # بررسی ffmpeg در PATH
 try:
     subprocess.run(["ffmpeg", "-version"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -37,6 +46,19 @@ if not RELYING_DICT_FILE.exists():
 # Import پنجره مدیریت دیکشنری
 from custom_dict_manager import DictManager
 
+def improve_persian_text(text):
+    """بهبود متن فارسی با تصحیح خودکار"""
+    if not PERSIAN_TOOLS_AVAILABLE:
+        return text
+    
+    # تصحیح کاراکترهای فارسی
+    text = characters.ar_to_fa(text)  # تبدیل عربی به فارسی
+    
+    # تصحیح اعداد
+    text = digits.en_to_fa(text)  # تبدیل اعداد انگلیسی به فارسی
+    
+    return text
+
 class TranscribeThread(QThread):
     progress = Signal(int)
     finished = Signal(str)
@@ -44,6 +66,7 @@ class TranscribeThread(QThread):
     def __init__(self, audio_path):
         super().__init__()
         self.audio_path = audio_path
+        # استفاده از مدل large با تنظیمات فارسی
         self.model = whisper.load_model("large")
         self._pause = False
         self._stop = False
@@ -63,13 +86,24 @@ class TranscribeThread(QThread):
             ], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             self.progress.emit(30)
 
-            # تبدیل صوت به متن با مدل whisper - تنظیمات فارسی
+            # تبدیل صوت به متن با تنظیمات بهینه فارسی
             result = self.model.transcribe(
                 temp_wav,
                 language="fa",  # زبان فارسی
-                initial_prompt="این یک فایل صوتی فارسی است که باید به متن تبدیل شود."
+                initial_prompt="این یک فایل صوتی فارسی است. لطفاً متن را با املای صحیح فارسی بنویسید.",
+                temperature=0.0,  # کاهش خلاقیت برای دقت بیشتر
+                beam_size=5,  # جستجوی بهتر برای کلمات
+                best_of=3,  # تست چندین بار و انتخاب بهترین نتیجه
+                patience=1.0,  # صبر بیشتر برای تشخیص دقیق‌تر
+                length_penalty=1.0,  # تنظیم طول متن
+                suppress_tokens=[-1],  # حذف توکن‌های اضافی
+                word_timestamps=True  # تشخیص بهتر کلمات
             )
             text = result["text"]
+            
+            # بهبود متن فارسی
+            text = improve_persian_text(text)
+            
             self.progress.emit(70)
 
             # لغات کاستوم

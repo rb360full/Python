@@ -2,3 +2,5 @@ pip install openai-whisper PySide6 arabic-reshaper python-bidi
 pip install numpy regex tqdm
 pip install persian-tools
 pip install soundfile
+
+
