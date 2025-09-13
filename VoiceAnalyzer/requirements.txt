@@ -3,4 +3,9 @@ pip install numpy regex tqdm
 pip install persian-tools
 pip install soundfile
 
+pip install google-cloud-speech
+pip install vosk
+pip install azure-cognitiveservices-speech
+pip install assemblyai
 
+pip install requests tqdm
