@@ -87,38 +87,122 @@ from custom_dict_manager import DictManager
 class ModelDownloader:
     """کلاس دانلود خودکار مدل‌ها"""
     
-    # URL های مدل‌های Vosk
-    VOSK_MODELS = {
+    # مدل‌های قابل دانلود
+    DOWNLOADABLE_MODELS = {
+        # Vosk Models
         "vosk_small": {
             "url": "https://alphacephei.com/vosk/models/vosk-model-small-en-us-0.15.zip",
             "name": "vosk-model-small-en-us-0.15",
             "size": "40 MB",
             "language": "انگلیسی",
-            "warning": "⚠️ فقط انگلیسی"
+            "warning": "⚠️ فقط انگلیسی",
+            "type": "Vosk"
         },
         "vosk_large": {
             "url": "https://alphacephei.com/vosk/models/vosk-model-en-us-0.22.zip", 
             "name": "vosk-model-en-us-0.22",
             "size": "1.8 GB",
             "language": "انگلیسی",
-            "warning": "⚠️ فقط انگلیسی"
+            "warning": "⚠️ فقط انگلیسی",
+            "type": "Vosk"
         },
         "vosk_persian": {
             "url": "https://alphacephei.com/vosk/models/vosk-model-fa-0.5.zip",
             "name": "vosk-model-fa-0.5", 
             "size": "1.13 GB",
             "language": "فارسی",
-            "warning": "✅ مخصوص فارسی"
+            "warning": "✅ مخصوص فارسی",
+            "type": "Vosk"
+        },
+        # Whisper Models (نیاز به دانلود خودکار)
+        "whisper_tiny": {
+            "url": "whisper://tiny",
+            "name": "whisper-tiny",
+            "size": "75 MB",
+            "language": "چند زبانه",
+            "warning": "⚠️ ضعیف برای فارسی",
+            "type": "Whisper"
+        },
+        "whisper_base": {
+            "url": "whisper://base",
+            "name": "whisper-base",
+            "size": "142 MB",
+            "language": "چند زبانه",
+            "warning": "⚠️ ضعیف برای فارسی",
+            "type": "Whisper"
+        },
+        "whisper_small": {
+            "url": "whisper://small",
+            "name": "whisper-small",
+            "size": "466 MB",
+            "language": "چند زبانه",
+            "warning": "✅ تعادل خوب",
+            "type": "Whisper"
+        },
+        "whisper_medium": {
+            "url": "whisper://medium",
+            "name": "whisper-medium",
+            "size": "1.5 GB",
+            "language": "چند زبانه",
+            "warning": "✅ دقت بالا",
+            "type": "Whisper"
+        },
+        "whisper_large": {
+            "url": "whisper://large",
+            "name": "whisper-large",
+            "size": "2.9 GB",
+            "language": "چند زبانه",
+            "warning": "✅ بالاترین دقت",
+            "type": "Whisper"
         }
+    }
+    
+    # برای سازگاری با کد قبلی
+    VOSK_MODELS = {
+        key: value for key, value in DOWNLOADABLE_MODELS.items() 
+        if value["type"] == "Vosk"
     }
     
     @staticmethod
     def download_model(model_id, progress_callback=None, progress_bar_callback=None):
-        """دانلود مدل Vosk"""
-        if model_id not in ModelDownloader.VOSK_MODELS:
+        """دانلود مدل"""
+        if model_id not in ModelDownloader.DOWNLOADABLE_MODELS:
             return False, f"مدل {model_id} پشتیبانی نمی‌شود"
         
-        model_info = ModelDownloader.VOSK_MODELS[model_id]
+        model_info = ModelDownloader.DOWNLOADABLE_MODELS[model_id]
+        
+        # برای مدل‌های Whisper
+        if model_info["type"] == "Whisper":
+            return ModelDownloader._download_whisper_model(model_id, model_info, progress_callback, progress_bar_callback)
+        
+        # برای مدل‌های Vosk
+        elif model_info["type"] == "Vosk":
+            return ModelDownloader._download_vosk_model(model_id, model_info, progress_callback, progress_bar_callback)
+        
+        return False, f"نوع مدل {model_info['type']} پشتیبانی نمی‌شود"
+    
+    @staticmethod
+    def _download_whisper_model(model_id, model_info, progress_callback=None, progress_bar_callback=None):
+        """دانلود مدل Whisper"""
+        try:
+            if progress_callback:
+                progress_callback(f"در حال دانلود {model_info['name']} ({model_info['size']})...")
+            
+            # Whisper خودش مدل‌ها رو دانلود می‌کنه
+            model_name = model_id.replace("whisper_", "")
+            model = whisper.load_model(model_name)
+            
+            if progress_bar_callback:
+                progress_bar_callback(100)
+            
+            return True, f"مدل {model_name} با موفقیت دانلود شد"
+            
+        except Exception as e:
+            return False, f"خطا در دانلود Whisper: {str(e)}"
+    
+    @staticmethod
+    def _download_vosk_model(model_id, model_info, progress_callback=None, progress_bar_callback=None):
+        """دانلود مدل Vosk"""
         models_dir = Path.home() / ".vosk" / "models"
         models_dir.mkdir(parents=True, exist_ok=True)
         
@@ -175,14 +259,29 @@ class ModelDownloader:
     @staticmethod
     def is_model_downloaded(model_id):
         """بررسی وجود مدل"""
-        if model_id not in ModelDownloader.VOSK_MODELS:
+        if model_id not in ModelDownloader.DOWNLOADABLE_MODELS:
             return False
         
-        model_info = ModelDownloader.VOSK_MODELS[model_id]
-        models_dir = Path.home() / ".vosk" / "models"
-        model_path = models_dir / model_info["name"]
+        model_info = ModelDownloader.DOWNLOADABLE_MODELS[model_id]
         
-        return model_path.exists()
+        # برای مدل‌های Whisper
+        if model_info["type"] == "Whisper":
+            try:
+                model_name = model_id.replace("whisper_", "")
+                # بررسی وجود مدل در cache Whisper
+                import whisper
+                model_path = whisper._MODELS.get(model_name)
+                return model_path is not None
+            except:
+                return False
+        
+        # برای مدل‌های Vosk
+        elif model_info["type"] == "Vosk":
+            models_dir = Path.home() / ".vosk" / "models"
+            model_path = models_dir / model_info["name"]
+            return model_path.exists()
+        
+        return False
 
 class ModelSelectionDialog(QDialog):
     def __init__(self, parent=None):
@@ -890,60 +989,105 @@ class VoiceApp(QWidget):
     
     def show_download_models_dialog(self):
         """نمایش dialog دانلود مدل‌ها"""
-        from PySide6.QtWidgets import QDialog, QVBoxLayout, QListWidget, QPushButton, QHBoxLayout, QLabel
+        from PySide6.QtWidgets import QDialog, QVBoxLayout, QListWidget, QPushButton, QHBoxLayout, QLabel, QTabWidget, QWidget
         from PySide6.QtCore import Qt
         
         dialog = QDialog(self)
-        dialog.setWindowTitle("دانلود مدل‌های Vosk")
+        dialog.setWindowTitle("دانلود مدل‌های Speech-to-Text")
         dialog.setModal(True)
-        dialog.resize(500, 400)
+        dialog.resize(700, 500)
         
         layout = QVBoxLayout(dialog)
         
         # توضیحات
-        info_label = QLabel("مدل‌های Vosk برای تشخیص گفتار (کاملاً رایگان و آفلاین):")
+        info_label = QLabel("مدل‌های قابل دانلود برای تشخیص گفتار (کاملاً رایگان و آفلاین):")
         layout.addWidget(info_label)
         
-        # لیست مدل‌ها
-        model_list = QListWidget()
+        # Tab widget برای دسته‌بندی مدل‌ها
+        tab_widget = QTabWidget()
         
-        for model_id, model_info in ModelDownloader.VOSK_MODELS.items():
-            status = "✅ دانلود شده" if ModelDownloader.is_model_downloaded(model_id) else "❌ دانلود نشده"
-            item_text = f"{model_info['name']} ({model_info['size']}) - {model_info['warning']} - {status}"
-            model_list.addItem(item_text)
+        # Tab Vosk
+        vosk_tab = QWidget()
+        vosk_layout = QVBoxLayout(vosk_tab)
+        vosk_list = QListWidget()
         
-        layout.addWidget(model_list)
+        for model_id, model_info in ModelDownloader.DOWNLOADABLE_MODELS.items():
+            if model_info["type"] == "Vosk":
+                status = "✅ دانلود شده" if ModelDownloader.is_model_downloaded(model_id) else "❌ دانلود نشده"
+                item_text = f"{model_info['name']} ({model_info['size']}) - {model_info['warning']} - {status}"
+                vosk_list.addItem(item_text)
+        
+        vosk_layout.addWidget(vosk_list)
+        tab_widget.addTab(vosk_tab, "Vosk Models")
+        
+        # Tab Whisper
+        whisper_tab = QWidget()
+        whisper_layout = QVBoxLayout(whisper_tab)
+        whisper_list = QListWidget()
+        
+        for model_id, model_info in ModelDownloader.DOWNLOADABLE_MODELS.items():
+            if model_info["type"] == "Whisper":
+                status = "✅ دانلود شده" if ModelDownloader.is_model_downloaded(model_id) else "❌ دانلود نشده"
+                item_text = f"{model_info['name']} ({model_info['size']}) - {model_info['warning']} - {status}"
+                whisper_list.addItem(item_text)
+        
+        whisper_layout.addWidget(whisper_list)
+        tab_widget.addTab(whisper_tab, "Whisper Models")
+        
+        layout.addWidget(tab_widget)
+        
+        # ذخیره reference ها
+        dialog.vosk_list = vosk_list
+        dialog.whisper_list = whisper_list
+        dialog.tab_widget = tab_widget
         
         # دکمه‌ها
         button_layout = QHBoxLayout()
         
         download_btn = QPushButton("دانلود مدل انتخاب شده")
         download_btn.setStyleSheet("background-color: #4CAF50; color: white; padding: 8px;")
-        download_btn.clicked.connect(lambda: self.download_selected_model(dialog, model_list))
+        download_btn.clicked.connect(lambda: self.download_selected_model(dialog))
         
-        download_all_btn = QPushButton("دانلود همه مدل‌ها")
+        download_all_btn = QPushButton("دانلود همه مدل‌های Vosk")
         download_all_btn.setStyleSheet("background-color: #2196F3; color: white; padding: 8px;")
-        download_all_btn.clicked.connect(lambda: self.download_all_models(dialog))
+        download_all_btn.clicked.connect(lambda: self.download_all_vosk_models(dialog))
+        
+        download_whisper_btn = QPushButton("دانلود همه مدل‌های Whisper")
+        download_whisper_btn.setStyleSheet("background-color: #FF9800; color: white; padding: 8px;")
+        download_whisper_btn.clicked.connect(lambda: self.download_all_whisper_models(dialog))
         
         close_btn = QPushButton("بستن")
         close_btn.clicked.connect(dialog.accept)
         
         button_layout.addWidget(download_btn)
         button_layout.addWidget(download_all_btn)
+        button_layout.addWidget(download_whisper_btn)
         button_layout.addWidget(close_btn)
         
         layout.addLayout(button_layout)
         
         dialog.exec()
     
-    def download_selected_model(self, dialog, model_list):
+    def download_selected_model(self, dialog):
         """دانلود مدل انتخاب شده"""
+        # تشخیص tab فعال
+        current_tab = dialog.tab_widget.currentIndex()
+        
+        if current_tab == 0:  # Vosk tab
+            model_list = dialog.vosk_list
+            model_type = "Vosk"
+        else:  # Whisper tab
+            model_list = dialog.whisper_list
+            model_type = "Whisper"
+        
         current_row = model_list.currentRow()
         if current_row == -1:
             QMessageBox.warning(dialog, "هشدار", "لطفاً یک مدل انتخاب کنید.")
             return
         
-        model_ids = list(ModelDownloader.VOSK_MODELS.keys())
+        # دریافت model_id
+        model_ids = [key for key, value in ModelDownloader.DOWNLOADABLE_MODELS.items() 
+                    if value["type"] == model_type]
         model_id = model_ids[current_row]
         
         if ModelDownloader.is_model_downloaded(model_id):
@@ -961,8 +1105,8 @@ class VoiceApp(QWidget):
         else:
             QMessageBox.critical(dialog, "خطا", f"خطا در دانلود: {result}")
     
-    def download_all_models(self, dialog):
-        """دانلود همه مدل‌ها"""
+    def download_all_vosk_models(self, dialog):
+        """دانلود همه مدل‌های Vosk"""
         reply = QMessageBox.question(
             dialog, "تأیید", 
             "آیا می‌خواهید همه مدل‌های Vosk را دانلود کنید؟\nاین کار ممکن است زمان زیادی ببرد.",
@@ -971,16 +1115,38 @@ class VoiceApp(QWidget):
         )
         
         if reply == QMessageBox.Yes:
-            QMessageBox.information(dialog, "شروع دانلود", "دانلود همه مدل‌ها شروع شد. لطفاً صبر کنید...")
+            QMessageBox.information(dialog, "شروع دانلود", "دانلود همه مدل‌های Vosk شروع شد. لطفاً صبر کنید...")
             
-            for model_id in ModelDownloader.VOSK_MODELS.keys():
-                if not ModelDownloader.is_model_downloaded(model_id):
+            for model_id, model_info in ModelDownloader.DOWNLOADABLE_MODELS.items():
+                if model_info["type"] == "Vosk" and not ModelDownloader.is_model_downloaded(model_id):
                     success, result = ModelDownloader.download_model(model_id)
                     if not success:
                         QMessageBox.critical(dialog, "خطا", f"خطا در دانلود {model_id}: {result}")
                         return
             
-            QMessageBox.information(dialog, "موفق", "همه مدل‌ها با موفقیت دانلود شدند!")
+            QMessageBox.information(dialog, "موفق", "همه مدل‌های Vosk با موفقیت دانلود شدند!")
+            dialog.accept()
+    
+    def download_all_whisper_models(self, dialog):
+        """دانلود همه مدل‌های Whisper"""
+        reply = QMessageBox.question(
+            dialog, "تأیید", 
+            "آیا می‌خواهید همه مدل‌های Whisper را دانلود کنید؟\nاین کار ممکن است زمان زیادی ببرد.",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No
+        )
+        
+        if reply == QMessageBox.Yes:
+            QMessageBox.information(dialog, "شروع دانلود", "دانلود همه مدل‌های Whisper شروع شد. لطفاً صبر کنید...")
+            
+            for model_id, model_info in ModelDownloader.DOWNLOADABLE_MODELS.items():
+                if model_info["type"] == "Whisper" and not ModelDownloader.is_model_downloaded(model_id):
+                    success, result = ModelDownloader.download_model(model_id)
+                    if not success:
+                        QMessageBox.critical(dialog, "خطا", f"خطا در دانلود {model_id}: {result}")
+                        return
+            
+            QMessageBox.information(dialog, "موفق", "همه مدل‌های Whisper با موفقیت دانلود شدند!")
             dialog.accept()
 
 
