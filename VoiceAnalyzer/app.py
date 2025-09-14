@@ -288,6 +288,22 @@ class ModelDownloader:
             "warning": "✅ مخصوص فارسی - Hugging Face",
             "type": "HuggingFace"
         },
+        "hf_wav2vec2_persian_v3": {
+            "url": "huggingface://m3hrdadfi/wav2vec2-large-xlsr-persian-v3",
+            "name": "wav2vec2-large-xlsr-persian-v3",
+            "size": "1.2 GB",
+            "language": "فارسی",
+            "warning": "✅ جدیدترین نسخه - بهترین کیفیت فارسی (WER: 10.36%)",
+            "type": "HuggingFace"
+        },
+        "hf_wav2vec2_persian_jonatas": {
+            "url": "huggingface://jonatasgrosman/wav2vec2-large-xlsr-53-persian",
+            "name": "wav2vec2-large-xlsr-53-persian",
+            "size": "1.2 GB",
+            "language": "فارسی",
+            "warning": "✅ مدل بهینه شده - کیفیت بالا (WER: 30.12%)",
+            "type": "HuggingFace"
+        },
         "hf_whisper_large_v3_persian": {
             "url": "huggingface://nezamisafa/whisper-large-v3-persian",
             "name": "whisper-large-v3-persian",
@@ -350,6 +366,22 @@ class ModelDownloader:
             "size": "2.9 GB",
             "language": "چند زبانه",
             "warning": "✅ بالاترین دقت",
+            "type": "HuggingFace"
+        },
+        "hf_whisper_large_v2": {
+            "url": "huggingface://openai/whisper-large-v2",
+            "name": "whisper-large-v2-hf",
+            "size": "2.9 GB",
+            "language": "چند زبانه",
+            "warning": "✅ جدیدترین نسخه",
+            "type": "HuggingFace"
+        },
+        "hf_whisper_large_v3": {
+            "url": "huggingface://openai/whisper-large-v3",
+            "name": "whisper-large-v3-hf",
+            "size": "2.9 GB",
+            "language": "چند زبانه",
+            "warning": "✅ جدیدترین نسخه",
             "type": "HuggingFace"
         },
         
@@ -439,9 +471,8 @@ class ModelDownloader:
     }
     
     @staticmethod
-    def download_model(model_id, progress_callback=None, progress_bar_callback=None, 
-                      speed_callback=None, eta_callback=None, size_callback=None):
-        """دانلود مدل با نمایش جزئیات پیشرفت"""
+    def download_model(model_id, progress_callback=None):
+        """دانلود مدل با نمایش نوتیفیکیشن ساده"""
         if model_id not in ModelDownloader.DOWNLOADABLE_MODELS:
             return False, f"مدل {model_id} پشتیبانی نمی‌شود"
         
@@ -449,27 +480,20 @@ class ModelDownloader:
         
         # برای مدل‌های Whisper
         if model_info["type"] == "Whisper":
-            return ModelDownloader._download_whisper_model(model_id, model_info, progress_callback, progress_bar_callback,
-                                                         speed_callback, eta_callback, size_callback)
+            return ModelDownloader._download_whisper_model(model_id, model_info, progress_callback)
         
         # برای مدل‌های Vosk
         elif model_info["type"] == "Vosk":
-            return ModelDownloader._download_vosk_model(model_id, model_info, progress_callback, progress_bar_callback,
-                                                      speed_callback, eta_callback, size_callback)
+            return ModelDownloader._download_vosk_model(model_id, model_info, progress_callback)
         
         return False, f"نوع مدل {model_info['type']} پشتیبانی نمی‌شود"
     
     @staticmethod
-    def _download_whisper_model(model_id, model_info, progress_callback=None, progress_bar_callback=None,
-                              speed_callback=None, eta_callback=None, size_callback=None):
-        """دانلود مدل Whisper با نمایش جزئیات پیشرفت"""
+    def _download_whisper_model(model_id, model_info, progress_callback=None):
+        """دانلود مدل Whisper با نمایش نوتیفیکیشن ساده"""
         try:
             if progress_callback:
                 progress_callback(f"در حال دانلود {model_info['name']} ({model_info['size']})...")
-            
-            # نمایش اطلاعات اندازه فایل
-            if size_callback:
-                size_callback(f"اندازه فایل: {model_info['size']}")
             
             # Whisper خودش مدل‌ها رو دانلود می‌کنه
             model_name = model_id.replace("whisper_", "")
@@ -479,31 +503,14 @@ class ModelDownloader:
             elif model_name == "large_v3":
                 model_name = "large-v3"
             
-            # شبیه‌سازی پیشرفت دانلود Whisper
-            start_time = time.time()
-            
-            # شروع دانلود
-            if progress_bar_callback:
-                progress_bar_callback(10)
-            
-            if speed_callback:
-                speed_callback("در حال اتصال...")
-            
-            if eta_callback:
-                eta_callback("محاسبه زمان...")
+            if progress_callback:
+                progress_callback(f"در حال بارگذاری مدل Whisper {model_name}...")
             
             # دانلود مدل
             model = whisper.load_model(model_name)
             
-            # تکمیل دانلود
-            if progress_bar_callback:
-                progress_bar_callback(100)
-            
-            if speed_callback:
-                speed_callback("✅ دانلود کامل")
-            
-            if eta_callback:
-                eta_callback("✅ آماده")
+            if progress_callback:
+                progress_callback(f"مدل {model_name} با موفقیت دانلود شد")
             
             return True, f"مدل {model_name} با موفقیت دانلود شد"
             
@@ -511,9 +518,8 @@ class ModelDownloader:
             return False, f"خطا در دانلود Whisper: {str(e)}"
     
     @staticmethod
-    def _download_vosk_model(model_id, model_info, progress_callback=None, progress_bar_callback=None, 
-                            speed_callback=None, eta_callback=None, size_callback=None):
-        """دانلود مدل Vosk با نمایش جزئیات پیشرفت"""
+    def _download_vosk_model(model_id, model_info, progress_callback=None):
+        """دانلود مدل Vosk با نمایش نوتیفیکیشن ساده"""
         models_dir = Path.home() / ".vosk" / "models"
         models_dir.mkdir(parents=True, exist_ok=True)
         
@@ -531,17 +537,6 @@ class ModelDownloader:
             response = requests.get(model_info["url"], stream=True)
             response.raise_for_status()
             
-            # محاسبه اندازه فایل
-            total_size = int(response.headers.get('content-length', 0))
-            downloaded_size = 0
-            start_time = time.time()
-            last_update_time = start_time
-            
-            # نمایش اطلاعات اندازه فایل
-            if size_callback and total_size > 0:
-                size_mb = total_size / (1024 * 1024)
-                size_callback(f"اندازه فایل: {size_mb:.1f} MB")
-            
             # ذخیره فایل
             zip_path = models_dir / f"{model_info['name']}.zip"
             
@@ -549,52 +544,10 @@ class ModelDownloader:
                 for chunk in response.iter_content(chunk_size=8192):
                     if chunk:
                         f.write(chunk)
-                        downloaded_size += len(chunk)
-                        
-                        current_time = time.time()
-                        
-                        # به‌روزرسانی progress bar و محاسبه سرعت
-                        if progress_bar_callback and total_size > 0:
-                            progress_percent = int((downloaded_size / total_size) * 100)
-                            progress_bar_callback(progress_percent)
-                            
-                            # محاسبه سرعت دانلود (هر 0.5 ثانیه)
-                            if current_time - last_update_time >= 0.5:
-                                elapsed_time = current_time - start_time
-                                if elapsed_time > 0:
-                                    speed_bps = downloaded_size / elapsed_time
-                                    speed_mbps = speed_bps / (1024 * 1024)
-                                    
-                                    if speed_callback:
-                                        speed_callback(f"سرعت: {speed_mbps:.1f} MB/s")
-                                    
-                                    # محاسبه زمان باقی‌مانده
-                                    if speed_bps > 0:
-                                        remaining_bytes = total_size - downloaded_size
-                                        eta_seconds = remaining_bytes / speed_bps
-                                        eta_minutes = int(eta_seconds // 60)
-                                        eta_seconds = int(eta_seconds % 60)
-                                        
-                                        if eta_callback:
-                                            if eta_minutes > 0:
-                                                eta_callback(f"زمان باقی‌مانده: {eta_minutes}:{eta_seconds:02d}")
-                                            else:
-                                                eta_callback(f"زمان باقی‌مانده: {eta_seconds} ثانیه")
-                                
-                                last_update_time = current_time
             
             # استخراج فایل
             if progress_callback:
                 progress_callback("در حال استخراج مدل...")
-            
-            if progress_bar_callback:
-                progress_bar_callback(100)  # دانلود کامل
-            
-            if speed_callback:
-                speed_callback("استخراج فایل...")
-            
-            if eta_callback:
-                eta_callback("تقریباً 10 ثانیه")
             
             with zipfile.ZipFile(zip_path, 'r') as zip_ref:
                 zip_ref.extractall(models_dir)
@@ -637,6 +590,10 @@ class ModelDownloader:
             models_dir = Path.home() / ".vosk" / "models"
             model_path = models_dir / model_info["name"]
             return model_path.exists()
+        
+        # برای مدل‌های Hugging Face - نیازی به دانلود ندارند
+        elif model_info["type"] == "HuggingFace":
+            return True
         
         return False
 
@@ -841,6 +798,8 @@ class ModelSelectionDialog(QDialog):
             
             # Hugging Face Transformers (آفلاین)
             ("hf_wav2vec2_persian", "✅ Wav2Vec2 Persian - مخصوص فارسی (1.2 GB)", "persian", "offline"),
+            ("hf_wav2vec2_persian_v3", "🏆 Wav2Vec2 Persian V3 - بهترین کیفیت فارسی (1.2 GB)", "persian", "offline"),
+            ("hf_wav2vec2_persian_jonatas", "⭐ Wav2Vec2 Persian Jonatas - مدل بهینه شده (1.2 GB)", "persian", "offline"),
             ("hf_whisper_large_v3_persian", "✅ Whisper Large V3 Persian - بهترین کیفیت (2.9 GB)", "persian", "offline"),
             ("hf_whisper_large_v3_persian_alt", "✅ Whisper Large V3 Persian Alt - جایگزین (2.9 GB)", "persian", "offline"),
             ("hf_wav2vec2_persian_alt", "⚠️ Wav2Vec2 Multilingual - چند زبانه (1.2 GB)", "both", "offline"),
@@ -849,6 +808,8 @@ class ModelSelectionDialog(QDialog):
             ("hf_whisper_small", "✅ Whisper Small HF - تعادل خوب (466 MB)", "both", "offline"),
             ("hf_whisper_medium", "✅ Whisper Medium HF - دقت بالا (1.5 GB)", "both", "offline"),
             ("hf_whisper_large", "✅ Whisper Large HF - بالاترین دقت (2.9 GB)", "both", "offline"),
+            ("hf_whisper_large_v2", "✅ Whisper Large V2 HF - جدیدترین نسخه (2.9 GB)", "both", "offline"),
+            ("hf_whisper_large_v3", "✅ Whisper Large V3 HF - جدیدترین نسخه (2.9 GB)", "both", "offline"),
             
             # SpeechRecognition (آنلاین)
             ("speechrecognition_google", "🌐 Google Speech - رایگان 60دقیقه/ماه (آنلاین)", "both", "online"),
@@ -1013,11 +974,7 @@ def improve_persian_text(text):
 class TranscribeThread(QThread):
     progress = Signal(int)
     finished = Signal(str)
-    download_progress = Signal(int)
     download_status = Signal(str)
-    download_speed = Signal(str)
-    download_eta = Signal(str)
-    download_size_info = Signal(str)
 
     def __init__(self, audio_path, model_name="vosk_persian"):
         super().__init__()
@@ -1345,29 +1302,13 @@ class TranscribeThread(QThread):
         try:
             # بررسی و دانلود مدل Vosk
             if not ModelDownloader.is_model_downloaded(self.model_name):
-                # دانلود مدل با progress bar و جزئیات
+                # دانلود مدل با نوتیفیکیشن ساده
                 def progress_callback(message):
                     self.download_status.emit(message)
                 
-                def progress_bar_callback(percent):
-                    self.download_progress.emit(percent)
-                
-                def speed_callback(speed):
-                    self.download_speed.emit(speed)
-                
-                def eta_callback(eta):
-                    self.download_eta.emit(eta)
-                
-                def size_callback(size):
-                    self.download_size_info.emit(size)
-                
                 success, result = ModelDownloader.download_model(
                     self.model_name, 
-                    progress_callback=progress_callback,
-                    progress_bar_callback=progress_bar_callback,
-                    speed_callback=speed_callback,
-                    eta_callback=eta_callback,
-                    size_callback=size_callback
+                    progress_callback=progress_callback
                 )
                 if not success:
                     return f"Vosk Error: {result}"
@@ -1514,7 +1455,6 @@ class TranscribeThread(QThread):
                     processor = AutoProcessor.from_pretrained(model_name)
                     model = AutoModelForCTC.from_pretrained(model_name)
                 except Exception as e:
-                    # اگر مدل فارسی در دسترس نباشد، از مدل عمومی استفاده کن
                     error_msg = str(e)
                     if "not a valid model identifier" in error_msg:
                         return f"""Hugging Face Error: مدل فارسی در دسترس نیست
@@ -1523,10 +1463,34 @@ class TranscribeThread(QThread):
 
 راه‌حل‌ها:
 1. اتصال اینترنت خود را بررسی کنید
+2. از مدل جدیدتر استفاده کنید: Wav2Vec2 Persian V3
+3. Token Hugging Face خود را تنظیم کنید:
+   huggingface-cli login
+   یا
+   hf auth login
+"""
+                    else:
+                        return f"Hugging Face Error: {error_msg}. لطفاً از Vosk Persian یا Whisper استفاده کنید."
+                        
+            elif self.model_name == "hf_wav2vec2_persian_v3":
+                # تلاش برای بارگذاری مدل فارسی V3 (جدیدترین نسخه)
+                try:
+                    model_name = "m3hrdadfi/wav2vec2-large-xlsr-persian-v3"
+                    processor = AutoProcessor.from_pretrained(model_name)
+                    model = AutoModelForCTC.from_pretrained(model_name)
+                except Exception as e:
+                    error_msg = str(e)
+                    if "not a valid model identifier" in error_msg:
+                        return f"""Hugging Face Error: مدل فارسی V3 در دسترس نیست
+
+مشکل: مدل m3hrdadfi/wav2vec2-large-xlsr-persian-v3 یافت نشد
+
+راه‌حل‌ها:
+1. اتصال اینترنت خود را بررسی کنید
 2. از مدل‌های جایگزین استفاده کنید:
+   • Wav2Vec2 Persian (نسخه قبلی)
    • Vosk Persian (بهترین برای فارسی)
    • Whisper Medium/Large (چند زبانه)
-   • Wav2Vec2 Multilingual (Hugging Face)
 
 برای استفاده از Hugging Face:
 1. به https://huggingface.co بروید
@@ -1536,6 +1500,36 @@ class TranscribeThread(QThread):
 """
                     else:
                         return f"Hugging Face Error: {error_msg}. لطفاً از Vosk Persian یا Whisper استفاده کنید."
+                        
+            elif self.model_name == "hf_wav2vec2_persian_jonatas":
+                # تلاش برای بارگذاری مدل فارسی Jonatas (بهینه شده)
+                try:
+                    model_name = "jonatasgrosman/wav2vec2-large-xlsr-53-persian"
+                    processor = AutoProcessor.from_pretrained(model_name)
+                    model = AutoModelForCTC.from_pretrained(model_name)
+                except Exception as e:
+                    error_msg = str(e)
+                    if "not a valid model identifier" in error_msg:
+                        return f"""Hugging Face Error: مدل فارسی Jonatas در دسترس نیست
+
+مشکل: مدل jonatasgrosman/wav2vec2-large-xlsr-53-persian یافت نشد
+
+راه‌حل‌ها:
+1. اتصال اینترنت خود را بررسی کنید
+2. از مدل‌های جایگزین استفاده کنید:
+   • Wav2Vec2 Persian V3 (جدیدترین)
+   • Wav2Vec2 Persian (نسخه قبلی)
+   • Vosk Persian (بهترین برای فارسی)
+
+برای استفاده از Hugging Face:
+1. به https://huggingface.co بروید
+2. حساب کاربری بسازید
+3. از دستور زیر استفاده کنید:
+   hf auth login
+"""
+                    else:
+                        return f"Hugging Face Error: {error_msg}. لطفاً از Vosk Persian یا Whisper استفاده کنید."
+                        
                     
             elif self.model_name == "hf_whisper_large_v3_persian":
                 # تلاش برای بارگذاری مدل Whisper فارسی
@@ -1606,6 +1600,10 @@ class TranscribeThread(QThread):
                 model_name = self.model_name.replace("hf_", "").replace("_hf", "")
                 if model_name == "whisper_large":
                     model_name = "openai/whisper-large-v2"
+                elif model_name == "whisper_large_v2":
+                    model_name = "openai/whisper-large-v2"
+                elif model_name == "whisper_large_v3":
+                    model_name = "openai/whisper-large-v3"
                 else:
                     model_name = f"openai/whisper-{model_name}"
                 
@@ -2141,71 +2139,90 @@ class VoiceApp(QWidget):
         self.btn_manage_dict.clicked.connect(self.open_dict_manager)
         self.layout.addWidget(self.btn_manage_dict)
 
-        self.btn_google_setup = QPushButton("Google Setup Guide")
-        self.btn_google_setup.setMinimumHeight(40)
-        self.btn_google_setup.setStyleSheet("background-color: #4285f4; color: white;")
-        self.btn_google_setup.clicked.connect(self.show_google_setup_guide)
-        self.layout.addWidget(self.btn_google_setup)
+        # Help menu button
+        self.btn_help = QPushButton("📚 راهنما و تنظیمات")
+        self.btn_help.setMinimumHeight(40)
+        self.btn_help.setStyleSheet("""
+            QPushButton {
+                background-color: #607D8B; 
+                color: white; 
+                font-weight: bold;
+                border: none;
+                border-radius: 5px;
+            }
+            QPushButton:hover {
+                background-color: #546E7A;
+            }
+            QPushButton:pressed {
+                background-color: #455A64;
+            }
+        """)
+        self.btn_help.clicked.connect(self.show_help_menu)
+        self.layout.addWidget(self.btn_help)
 
         self.btn_download_models = QPushButton("Download Models")
         self.btn_download_models.setMinimumHeight(40)
-        self.btn_download_models.setStyleSheet("background-color: #ff6b35; color: white;")
+        self.btn_download_models.setStyleSheet("""
+            QPushButton {
+                background-color: #ff6b35; 
+                color: white;
+                border: none;
+                border-radius: 5px;
+            }
+            QPushButton:hover {
+                background-color: #e55a2b;
+            }
+            QPushButton:pressed {
+                background-color: #cc4a1f;
+            }
+        """)
         self.btn_download_models.clicked.connect(self.show_download_models_dialog)
         self.layout.addWidget(self.btn_download_models)
 
         self.btn_change_model = QPushButton("Change Model")
         self.btn_change_model.setMinimumHeight(40)
-        self.btn_change_model.setStyleSheet("background-color: #9c27b0; color: white;")
+        self.btn_change_model.setStyleSheet("""
+            QPushButton {
+                background-color: #9c27b0; 
+                color: white;
+                border: none;
+                border-radius: 5px;
+            }
+            QPushButton:hover {
+                background-color: #8e24aa;
+            }
+            QPushButton:pressed {
+                background-color: #7b1fa2;
+            }
+        """)
         self.btn_change_model.clicked.connect(self.change_model)
         self.layout.addWidget(self.btn_change_model)
 
-        self.btn_huggingface_setup = QPushButton("Hugging Face Setup")
-        self.btn_huggingface_setup.setMinimumHeight(40)
-        self.btn_huggingface_setup.setStyleSheet("background-color: #ff6b35; color: white;")
-        self.btn_huggingface_setup.clicked.connect(self.show_huggingface_setup_guide)
-        self.layout.addWidget(self.btn_huggingface_setup)
-
-        self.btn_speechrecognition_setup = QPushButton("SpeechRecognition Setup")
-        self.btn_speechrecognition_setup.setMinimumHeight(40)
-        self.btn_speechrecognition_setup.setStyleSheet("background-color: #2196F3; color: white;")
-        self.btn_speechrecognition_setup.clicked.connect(self.show_speechrecognition_setup_guide)
-        self.layout.addWidget(self.btn_speechrecognition_setup)
-
-
-        self.btn_install_pytorch = QPushButton("نصب PyTorch (برای Silero)")
-        self.btn_install_pytorch.setMinimumHeight(40)
-        self.btn_install_pytorch.setStyleSheet("background-color: #9C27B0; color: white;")
-        self.btn_install_pytorch.clicked.connect(self.show_pytorch_install_guide)
-        self.layout.addWidget(self.btn_install_pytorch)
-
-        self.btn_test_silero = QPushButton("تست Silero STT")
-        self.btn_test_silero.setMinimumHeight(40)
-        self.btn_test_silero.setStyleSheet("background-color: #FF5722; color: white;")
-        self.btn_test_silero.clicked.connect(self.test_silero_stt)
-        self.layout.addWidget(self.btn_test_silero)
-
-        self.btn_clear_silero_cache = QPushButton("پاک کردن Cache Silero")
-        self.btn_clear_silero_cache.setMinimumHeight(40)
-        self.btn_clear_silero_cache.setStyleSheet("background-color: #795548; color: white;")
-        self.btn_clear_silero_cache.clicked.connect(self.clear_silero_cache)
-        self.layout.addWidget(self.btn_clear_silero_cache)
-
-        self.progress = QProgressBar()
-        self.layout.addWidget(self.progress)
+        # Model status label - simple text without button styling
+        self.model_status = QLabel("مدل بارگذاری نشده")
+        self.model_status.setStyleSheet("""
+            color: #666666; 
+            font-size: 14px;
+            padding: 8px;
+            background-color: transparent;
+            border: none;
+            outline: none;
+        """)
+        self.model_status.setAlignment(Qt.AlignCenter)
+        self.model_status.setFocusPolicy(Qt.NoFocus)  # Remove focus ability
+        self.layout.addWidget(self.model_status)
         
-        # Progress bar برای دانلود
-        self.download_progress = QProgressBar()
-        self.download_progress.setVisible(False)
-        self.download_progress.setMinimumHeight(25)
-        self.download_progress.setStyleSheet("""
+        # Progress bar for conversion
+        self.progress = QProgressBar()
+        self.progress.setStyleSheet("""
             QProgressBar {
                 border: 2px solid #2196F3;
                 border-radius: 8px;
                 text-align: center;
                 font-weight: bold;
                 font-size: 14px;
-                background-color: #f0f0f0;
-                color: #1976D2;
+                background-color: #2d2d2d;
+                color: #ffffff;
             }
             QProgressBar::chunk {
                 background: qlineargradient(x1: 0, y1: 0, x2: 1, y2: 0,
@@ -2214,67 +2231,22 @@ class VoiceApp(QWidget):
                 margin: 1px;
             }
         """)
-        self.layout.addWidget(self.download_progress)
+        self.layout.addWidget(self.progress)
         
-        # Status label برای دانلود
-        self.download_status = QLabel("")
-        self.download_status.setVisible(False)
-        self.download_status.setStyleSheet("""
-            color: #1976D2; 
+        # Temporary notification label
+        self.notification_label = QLabel("")
+        self.notification_label.setVisible(False)
+        self.notification_label.setStyleSheet("""
+            color: #ffffff; 
             font-weight: bold; 
             font-size: 14px;
-            padding: 8px;
-            background-color: #E3F2FD;
+            padding: 12px;
+            background-color: #424242;
             border: 2px solid #2196F3;
             border-radius: 8px;
         """)
-        self.download_status.setAlignment(Qt.AlignCenter)
-        self.layout.addWidget(self.download_status)
-        
-        # Speed label برای دانلود
-        self.download_speed = QLabel("")
-        self.download_speed.setVisible(False)
-        self.download_speed.setStyleSheet("""
-            color: #FF9800; 
-            font-weight: bold; 
-            font-size: 12px;
-            padding: 4px;
-            background-color: #FFF3E0;
-            border: 1px solid #FF9800;
-            border-radius: 4px;
-        """)
-        self.download_speed.setAlignment(Qt.AlignCenter)
-        self.layout.addWidget(self.download_speed)
-        
-        # ETA label برای دانلود
-        self.download_eta = QLabel("")
-        self.download_eta.setVisible(False)
-        self.download_eta.setStyleSheet("""
-            color: #9C27B0; 
-            font-weight: bold; 
-            font-size: 12px;
-            padding: 4px;
-            background-color: #F3E5F5;
-            border: 1px solid #9C27B0;
-            border-radius: 4px;
-        """)
-        self.download_eta.setAlignment(Qt.AlignCenter)
-        self.layout.addWidget(self.download_eta)
-        
-        # Size info label برای دانلود
-        self.download_size_info = QLabel("")
-        self.download_size_info.setVisible(False)
-        self.download_size_info.setStyleSheet("""
-            color: #607D8B; 
-            font-weight: bold; 
-            font-size: 12px;
-            padding: 4px;
-            background-color: #ECEFF1;
-            border: 1px solid #607D8B;
-            border-radius: 4px;
-        """)
-        self.download_size_info.setAlignment(Qt.AlignCenter)
-        self.layout.addWidget(self.download_size_info)
+        self.notification_label.setAlignment(Qt.AlignCenter)
+        self.layout.addWidget(self.notification_label)
 
         self.scroll = QScrollArea()
         self.text_edit = QTextEdit()
@@ -2398,67 +2370,52 @@ class VoiceApp(QWidget):
         self.thread = TranscribeThread(self.audio_path, self.selected_model)
         self.thread.progress.connect(self.progress.setValue)
         self.thread.finished.connect(self.display_result)
-        self.thread.download_progress.connect(self.update_download_progress)
-        self.thread.download_status.connect(self.update_download_status)
-        self.thread.download_speed.connect(self.update_download_speed)
-        self.thread.download_eta.connect(self.update_download_eta)
-        self.thread.download_size_info.connect(self.update_download_size_info)
+        self.thread.download_status.connect(self.show_notification)
         self.thread.start()
 
-    def update_download_progress(self, percent):
-        """به‌روزرسانی progress bar دانلود"""
-        self.download_progress.setValue(percent)
-        self.download_progress.setFormat(f"📥 دانلود: {percent}%")
+    def show_notification(self, message):
+        """نمایش نوتیفیکیشن موقت"""
+        from PySide6.QtCore import QTimer
         
-        if percent == 100:
-            # کمی صبر کنید تا کاربر progress کامل را ببیند
-            import time
-            time.sleep(2)
-            self.hide_download_ui()
+        # Update model status when model is ready
+        if "آماده" in message or "بارگذاری شد" in message:
+            self.model_status.setText("✅ مدل بارگذاری شد")
+            self.model_status.setStyleSheet("""
+                color: #4CAF50; 
+                font-size: 14px;
+                padding: 8px;
+                background-color: transparent;
+                border: none;
+                outline: none;
+            """)
+        
+        # Show temporary notification
+        self.notification_label.setText(f"📥 {message}")
+        self.notification_label.setVisible(True)
+        
+        # Auto-hide after 3 seconds
+        QTimer.singleShot(3000, self.hide_notification)
     
-    def update_download_status(self, message):
-        """به‌روزرسانی status دانلود"""
-        self.download_status.setText(f"📥 {message}")
-        self.show_download_ui()
-    
-    def update_download_speed(self, speed):
-        """به‌روزرسانی سرعت دانلود"""
-        self.download_speed.setText(f"⚡ {speed}")
-        self.download_speed.setVisible(True)
-    
-    def update_download_eta(self, eta):
-        """به‌روزرسانی زمان باقی‌مانده"""
-        self.download_eta.setText(f"⏱️ {eta}")
-        self.download_eta.setVisible(True)
-    
-    def update_download_size_info(self, size_info):
-        """به‌روزرسانی اطلاعات اندازه فایل"""
-        self.download_size_info.setText(f"📊 {size_info}")
-        self.download_size_info.setVisible(True)
-    
-    def show_download_ui(self):
-        """نمایش UI دانلود"""
-        self.download_progress.setVisible(True)
-        self.download_status.setVisible(True)
-        self.download_progress.setValue(0)
-    
-    def hide_download_ui(self):
-        """مخفی کردن UI دانلود"""
-        self.download_progress.setVisible(False)
-        self.download_status.setVisible(False)
-        self.download_speed.setVisible(False)
-        self.download_eta.setVisible(False)
-        self.download_size_info.setVisible(False)
+    def hide_notification(self):
+        """مخفی کردن نوتیفیکیشن"""
+        self.notification_label.setVisible(False)
 
     def display_result(self, text):
-        self.text_edit.setPlainText(text)
+        # Add model information below the converted text
+        model_info = f"\n\n---\nکانورت شده با مدل: {self.selected_model}"
+        full_text = text + model_info
+        
+        self.text_edit.setPlainText(full_text)
         save_path, _ = QFileDialog.getSaveFileName(
             self, "Save Text", "", "Text Files (*.txt)"
         )
         if save_path:
             with open(save_path, "w", encoding="utf-8") as f:
-                f.write(text)
+                f.write(full_text)
             self.output_file = save_path
+        
+        # Reset thread to allow re-conversion
+        self.thread = None
 
     def open_text_file(self):
         if self.output_file and os.path.exists(self.output_file):
@@ -2471,10 +2428,11 @@ class VoiceApp(QWidget):
             QMessageBox.warning(self, "Warning", "No audio file selected!")
             return
 
-        if not self.thread:
+        if not self.thread or not self.thread.isRunning():
+            # Allow re-conversion of the same file
             self.start_transcription()
         else:
-            QMessageBox.information(self, "Info", "Pause / Resume toggle clicked (future implementation).")
+            QMessageBox.information(self, "Info", "Conversion is already in progress. Please wait for it to complete.")
 
     def stop_processing(self):
         if self.thread and self.thread.isRunning():
@@ -2512,6 +2470,192 @@ class VoiceApp(QWidget):
         }
         ConfigManager.update_window_geometry(geometry)
         event.accept()
+
+    def show_help_menu(self):
+        """نمایش منوی راهنما و تنظیمات"""
+        from PySide6.QtWidgets import QDialog, QVBoxLayout, QPushButton, QHBoxLayout, QLabel, QScrollArea, QWidget
+        from PySide6.QtCore import Qt
+        
+        dialog = QDialog(self)
+        dialog.setWindowTitle("📚 راهنما و تنظیمات")
+        dialog.setModal(True)
+        dialog.resize(800, 600)
+        
+        layout = QVBoxLayout(dialog)
+        
+        # Title
+        title_label = QLabel("راهنما و تنظیمات برنامه")
+        title_label.setStyleSheet("font-weight: bold; font-size: 18px; color: #1976D2; padding: 10px;")
+        title_label.setAlignment(Qt.AlignCenter)
+        layout.addWidget(title_label)
+        
+        # Scroll area for buttons
+        scroll_area = QScrollArea()
+        scroll_widget = QWidget()
+        scroll_layout = QVBoxLayout(scroll_widget)
+        
+        # Setup guides section
+        setup_label = QLabel("🔧 راهنمای تنظیم مدل‌ها:")
+        setup_label.setStyleSheet("font-weight: bold; font-size: 14px; color: #424242; padding: 5px;")
+        scroll_layout.addWidget(setup_label)
+        
+        # Google Setup
+        btn_google_setup = QPushButton("Google Speech Setup Guide")
+        btn_google_setup.setMinimumHeight(40)
+        btn_google_setup.setStyleSheet("""
+            QPushButton {
+                background-color: #4285f4; 
+                color: white;
+                border: none;
+                border-radius: 5px;
+            }
+            QPushButton:hover {
+                background-color: #3367d6;
+            }
+            QPushButton:pressed {
+                background-color: #2c5aa0;
+            }
+        """)
+        btn_google_setup.clicked.connect(lambda: (dialog.accept(), self.show_google_setup_guide()))
+        scroll_layout.addWidget(btn_google_setup)
+        
+        # Hugging Face Setup
+        btn_huggingface_setup = QPushButton("Hugging Face Setup Guide")
+        btn_huggingface_setup.setMinimumHeight(40)
+        btn_huggingface_setup.setStyleSheet("""
+            QPushButton {
+                background-color: #ff6b35; 
+                color: white;
+                border: none;
+                border-radius: 5px;
+            }
+            QPushButton:hover {
+                background-color: #e55a2b;
+            }
+            QPushButton:pressed {
+                background-color: #cc4a1f;
+            }
+        """)
+        btn_huggingface_setup.clicked.connect(lambda: (dialog.accept(), self.show_huggingface_setup_guide()))
+        scroll_layout.addWidget(btn_huggingface_setup)
+        
+        # SpeechRecognition Setup
+        btn_speechrecognition_setup = QPushButton("SpeechRecognition Setup Guide")
+        btn_speechrecognition_setup.setMinimumHeight(40)
+        btn_speechrecognition_setup.setStyleSheet("""
+            QPushButton {
+                background-color: #2196F3; 
+                color: white;
+                border: none;
+                border-radius: 5px;
+            }
+            QPushButton:hover {
+                background-color: #1976D2;
+            }
+            QPushButton:pressed {
+                background-color: #1565C0;
+            }
+        """)
+        btn_speechrecognition_setup.clicked.connect(lambda: (dialog.accept(), self.show_speechrecognition_setup_guide()))
+        scroll_layout.addWidget(btn_speechrecognition_setup)
+        
+        # PyTorch Install Guide
+        btn_install_pytorch = QPushButton("نصب PyTorch (برای Silero)")
+        btn_install_pytorch.setMinimumHeight(40)
+        btn_install_pytorch.setStyleSheet("""
+            QPushButton {
+                background-color: #9C27B0; 
+                color: white;
+                border: none;
+                border-radius: 5px;
+            }
+            QPushButton:hover {
+                background-color: #8E24AA;
+            }
+            QPushButton:pressed {
+                background-color: #7B1FA2;
+            }
+        """)
+        btn_install_pytorch.clicked.connect(lambda: (dialog.accept(), self.show_pytorch_install_guide()))
+        scroll_layout.addWidget(btn_install_pytorch)
+        
+        # Test and maintenance section
+        test_label = QLabel("🧪 تست و نگهداری:")
+        test_label.setStyleSheet("font-weight: bold; font-size: 14px; color: #424242; padding: 5px; margin-top: 10px;")
+        scroll_layout.addWidget(test_label)
+        
+        # Test Silero
+        btn_test_silero = QPushButton("تست Silero STT")
+        btn_test_silero.setMinimumHeight(40)
+        btn_test_silero.setStyleSheet("""
+            QPushButton {
+                background-color: #FF5722; 
+                color: white;
+                border: none;
+                border-radius: 5px;
+            }
+            QPushButton:hover {
+                background-color: #E64A19;
+            }
+            QPushButton:pressed {
+                background-color: #D84315;
+            }
+        """)
+        btn_test_silero.clicked.connect(lambda: (dialog.accept(), self.test_silero_stt()))
+        scroll_layout.addWidget(btn_test_silero)
+        
+        # Clear Silero Cache
+        btn_clear_silero_cache = QPushButton("پاک کردن Cache Silero")
+        btn_clear_silero_cache.setMinimumHeight(40)
+        btn_clear_silero_cache.setStyleSheet("""
+            QPushButton {
+                background-color: #795548; 
+                color: white;
+                border: none;
+                border-radius: 5px;
+            }
+            QPushButton:hover {
+                background-color: #6D4C41;
+            }
+            QPushButton:pressed {
+                background-color: #5D4037;
+            }
+        """)
+        btn_clear_silero_cache.clicked.connect(lambda: (dialog.accept(), self.clear_silero_cache()))
+        scroll_layout.addWidget(btn_clear_silero_cache)
+        
+        # Add stretch to push buttons to top
+        scroll_layout.addStretch()
+        
+        scroll_area.setWidget(scroll_widget)
+        scroll_area.setWidgetResizable(True)
+        layout.addWidget(scroll_area)
+        
+        # Close button
+        close_layout = QHBoxLayout()
+        close_layout.addStretch()
+        close_btn = QPushButton("بستن")
+        close_btn.setMinimumHeight(40)
+        close_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #607D8B; 
+                color: white;
+                border: none;
+                border-radius: 5px;
+            }
+            QPushButton:hover {
+                background-color: #546E7A;
+            }
+            QPushButton:pressed {
+                background-color: #455A64;
+            }
+        """)
+        close_btn.clicked.connect(dialog.accept)
+        close_layout.addWidget(close_btn)
+        close_layout.addStretch()
+        layout.addLayout(close_layout)
+        
+        dialog.exec()
 
     def show_google_setup_guide(self):
         from PySide6.QtWidgets import QDialog, QVBoxLayout, QTextEdit, QPushButton, QHBoxLayout

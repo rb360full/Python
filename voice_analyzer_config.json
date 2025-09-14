@@ -1,11 +1,11 @@
 {
-  "selected_model": "whisper_large_v3",
-  "last_audio_path": "C:/Users/Reza/Desktop/_ALI/nadimi.mp3",
+  "selected_model": "hf_wav2vec2_persian_jonatas",
+  "last_audio_path": "C:/Users/Reza/Desktop/_ALI/02.ogg",
   "window_geometry": {
-    "x": 326,
-    "y": 26,
-    "width": 1062,
-    "height": 866
+    "x": 384,
+    "y": -30,
+    "width": 1004,
+    "height": 826
   },
   "preferred_language": "fa"
 }
