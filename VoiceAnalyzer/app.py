@@ -588,8 +588,14 @@ class ModelDownloader:
                 
                 # بررسی وجود مدل در cache Whisper
                 import whisper
-                model_path = whisper._MODELS.get(model_name)
-                return model_path is not None
+                import os
+                
+                # مسیر cache Whisper
+                cache_dir = os.path.expanduser("~/.cache/whisper")
+                model_file = f"{model_name}.pt"
+                model_path = os.path.join(cache_dir, model_file)
+                
+                return os.path.exists(model_path)
             except:
                 return False
         
@@ -599,11 +605,543 @@ class ModelDownloader:
             model_path = models_dir / model_info["name"]
             return model_path.exists()
         
-        # برای مدل‌های Hugging Face - نیازی به دانلود ندارند
+        # برای مدل‌های Hugging Face - بررسی cache محلی
         elif model_info["type"] == "HuggingFace":
-            return True
+            try:
+                import os
+                from transformers import AutoModel, AutoTokenizer
+                
+                # استخراج نام مدل از URL
+                model_url = model_info["url"]
+                if model_url.startswith("huggingface://"):
+                    model_name = model_url.replace("huggingface://", "")
+                    
+                    # بررسی cache محلی Hugging Face
+                    cache_dir = os.path.expanduser("~/.cache/huggingface/hub")
+                    
+                    # جستجو در فولدرهای cache
+                    if os.path.exists(cache_dir):
+                        for item in os.listdir(cache_dir):
+                            if model_name.replace("/", "--") in item:
+                                return True
+                    
+                    # بررسی cache transformers
+                    try:
+                        # تلاش برای بارگذاری بدون دانلود
+                        AutoTokenizer.from_pretrained(model_name, local_files_only=True)
+                        return True
+                    except:
+                        return False
+                
+                return False
+            except:
+                return False
         
         return False
+
+class ModelDownloadDialog(QDialog):
+    """دیالوگ دانلود مدل با نوار پیشرفت"""
+    
+    def __init__(self, model_id, model_info, parent=None):
+        super().__init__(parent)
+        self.model_id = model_id
+        self.model_info = model_info
+        self.download_thread = None
+        self.setup_ui()
+        
+    def setup_ui(self):
+        self.setWindowTitle(f"دانلود مدل {self.model_info['name']}")
+        self.setModal(True)
+        self.resize(400, 200)
+        
+        self.setStyleSheet("""
+            QDialog {
+                background-color: #1e1e1e;
+                color: #ffffff;
+            }
+            QLabel {
+                color: #ffffff;
+            }
+            QProgressBar {
+                border: 2px solid #2196F3;
+                border-radius: 8px;
+                text-align: center;
+                font-weight: bold;
+                font-size: 14px;
+                background-color: #2d2d2d;
+                color: #ffffff;
+            }
+            QProgressBar::chunk {
+                background: qlineargradient(x1: 0, y1: 0, x2: 1, y2: 0,
+                    stop: 0 #4CAF50, stop: 1 #45a049);
+                border-radius: 6px;
+                margin: 1px;
+            }
+            QPushButton {
+                background-color: #f44336;
+                color: white;
+                padding: 8px 16px;
+                border: none;
+                border-radius: 4px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #d32f2f;
+            }
+        """)
+        
+        layout = QVBoxLayout(self)
+        
+        # اطلاعات مدل
+        info_label = QLabel(f"در حال دانلود: {self.model_info['name']}")
+        info_label.setStyleSheet("font-size: 16px; font-weight: bold; color: #4CAF50;")
+        layout.addWidget(info_label)
+        
+        size_label = QLabel(f"حجم: {self.model_info['size']}")
+        size_label.setStyleSheet("font-size: 14px; color: #81c784;")
+        layout.addWidget(size_label)
+        
+        # نوار پیشرفت
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setRange(0, 100)
+        self.progress_bar.setValue(0)
+        layout.addWidget(self.progress_bar)
+        
+        # برچسب وضعیت
+        self.status_label = QLabel("آماده برای دانلود...")
+        self.status_label.setStyleSheet("font-size: 12px; color: #ffffff;")
+        layout.addWidget(self.status_label)
+        
+        # دکمه لغو
+        self.cancel_button = QPushButton("لغو دانلود")
+        self.cancel_button.clicked.connect(self.cancel_download)
+        layout.addWidget(self.cancel_button)
+        
+    def start_download(self):
+        """شروع دانلود مدل"""
+        self.download_thread = ModelDownloadThread(self.model_id, self.model_info)
+        self.download_thread.progress.connect(self.update_progress)
+        self.download_thread.status.connect(self.update_status)
+        self.download_thread.finished.connect(self.download_finished)
+        self.download_thread.start()
+        
+    def update_progress(self, value):
+        """به‌روزرسانی نوار پیشرفت"""
+        self.progress_bar.setValue(value)
+        
+    def update_status(self, message):
+        """به‌روزرسانی پیام وضعیت"""
+        self.status_label.setText(message)
+        
+    def cancel_download(self):
+        """لغو دانلود"""
+        if self.download_thread and self.download_thread.isRunning():
+            self.download_thread.terminate()
+        self.reject()
+        
+    def download_finished(self, success, message):
+        """پایان دانلود"""
+        if success:
+            self.accept()
+        else:
+            from PySide6.QtWidgets import QMessageBox
+            QMessageBox.critical(self, "خطا در دانلود", message)
+            self.reject()
+
+class ModelDownloadThread(QThread):
+    """Thread برای دانلود مدل با نوار پیشرفت"""
+    progress = Signal(int)
+    status = Signal(str)
+    finished = Signal(bool, str)
+    
+    def __init__(self, model_id, model_info):
+        super().__init__()
+        self.model_id = model_id
+        self.model_info = model_info
+        
+    def run(self):
+        try:
+            self.status.emit("شروع دانلود...")
+            self.progress.emit(5)
+            
+            if self.model_info["type"] == "Whisper":
+                success, message = self._download_whisper_with_progress()
+            elif self.model_info["type"] == "Vosk":
+                success, message = self._download_vosk_with_progress()
+            elif self.model_info["type"] == "HuggingFace":
+                success, message = self._download_huggingface_with_progress()
+            else:
+                success, message = False, f"نوع مدل {self.model_info['type']} پشتیبانی نمی‌شود"
+                
+            self.finished.emit(success, message)
+            
+        except Exception as e:
+            self.finished.emit(False, f"خطا در دانلود: {str(e)}")
+    
+    def _download_whisper_with_progress(self):
+        """دانلود مدل Whisper با نوار پیشرفت"""
+        try:
+            import whisper
+            
+            model_name = self.model_id.replace("whisper_", "")
+            if model_name == "large_v2":
+                model_name = "large-v2"
+            elif model_name == "large_v3":
+                model_name = "large-v3"
+            
+            self.status.emit(f"در حال دانلود مدل Whisper {model_name}...")
+            self.progress.emit(20)
+            
+            # دانلود مدل
+            model = whisper.load_model(model_name)
+            
+            self.progress.emit(100)
+            self.status.emit("دانلود کامل شد!")
+            
+            return True, f"مدل {model_name} با موفقیت دانلود شد"
+            
+        except Exception as e:
+            return False, f"خطا در دانلود Whisper: {str(e)}"
+    
+    def _download_vosk_with_progress(self):
+        """دانلود مدل Vosk با نوار پیشرفت"""
+        try:
+            import requests
+            import zipfile
+            from pathlib import Path
+            
+            models_dir = Path.home() / ".vosk" / "models"
+            models_dir.mkdir(parents=True, exist_ok=True)
+            
+            model_path = models_dir / self.model_info["name"]
+            
+            # اگر مدل قبلاً دانلود شده
+            if model_path.exists():
+                self.progress.emit(100)
+                self.status.emit("مدل قبلاً دانلود شده!")
+                return True, f"مدل {self.model_info['name']} قبلاً دانلود شده"
+            
+            self.status.emit(f"در حال دانلود {self.model_info['name']}...")
+            self.progress.emit(10)
+            
+            # دانلود فایل
+            response = requests.get(self.model_info["url"], stream=True)
+            response.raise_for_status()
+            
+            total_size = int(response.headers.get('content-length', 0))
+            downloaded_size = 0
+            
+            zip_path = models_dir / f"{self.model_info['name']}.zip"
+            
+            with open(zip_path, 'wb') as f:
+                for chunk in response.iter_content(chunk_size=8192):
+                    if chunk:
+                        f.write(chunk)
+                        downloaded_size += len(chunk)
+                        
+                        if total_size > 0:
+                            progress = int((downloaded_size / total_size) * 70) + 10  # 10-80%
+                            self.progress.emit(progress)
+            
+            self.status.emit("در حال استخراج مدل...")
+            self.progress.emit(85)
+            
+            # استخراج فایل
+            with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+                zip_ref.extractall(models_dir)
+            
+            # حذف فایل zip
+            zip_path.unlink()
+            
+            self.progress.emit(100)
+            self.status.emit("دانلود و استخراج کامل شد!")
+            
+            return True, f"مدل {self.model_info['name']} با موفقیت دانلود شد"
+            
+        except Exception as e:
+            return False, f"خطا در دانلود Vosk: {str(e)}"
+    
+    def _download_huggingface_with_progress(self):
+        """دانلود مدل Hugging Face با نوار پیشرفت"""
+        try:
+            from transformers import AutoModel, AutoTokenizer
+            import os
+            
+            # استخراج نام مدل از URL
+            model_url = self.model_info["url"]
+            if not model_url.startswith("huggingface://"):
+                return False, "URL مدل Hugging Face نامعتبر است"
+            
+            model_name = model_url.replace("huggingface://", "")
+            
+            self.status.emit(f"در حال دانلود مدل Hugging Face {model_name}...")
+            self.progress.emit(20)
+            
+            # دانلود tokenizer
+            self.status.emit("در حال دانلود tokenizer...")
+            self.progress.emit(40)
+            tokenizer = AutoTokenizer.from_pretrained(model_name)
+            
+            # دانلود مدل
+            self.status.emit("در حال دانلود مدل...")
+            self.progress.emit(70)
+            model = AutoModel.from_pretrained(model_name)
+            
+            self.progress.emit(100)
+            self.status.emit("دانلود کامل شد!")
+            
+            return True, f"مدل {model_name} با موفقیت دانلود شد"
+            
+        except Exception as e:
+            return False, f"خطا در دانلود Hugging Face: {str(e)}"
+
+class DownloadedModelsManager(QDialog):
+    """مدیریت مدل‌های دانلود شده"""
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("مدیریت مدل‌های دانلود شده")
+        self.setModal(True)
+        self.resize(700, 500)
+        self.setup_ui()
+        self.refresh_models()
+        
+    def setup_ui(self):
+        self.setStyleSheet("""
+            QDialog {
+                background-color: #1e1e1e;
+                color: #ffffff;
+            }
+            QLabel {
+                color: #ffffff;
+            }
+            QListWidget {
+                background-color: #2d2d2d;
+                border: 1px solid #444444;
+                border-radius: 8px;
+                padding: 5px;
+                color: #ffffff;
+                font-size: 14px;
+            }
+            QListWidget::item {
+                padding: 8px;
+                border-bottom: 1px solid #444444;
+            }
+            QListWidget::item:selected {
+                background-color: #2196F3;
+                color: #ffffff;
+            }
+            QPushButton {
+                background-color: #4CAF50;
+                color: white;
+                padding: 10px 20px;
+                border: none;
+                border-radius: 6px;
+                font-weight: bold;
+                font-size: 14px;
+            }
+            QPushButton:hover {
+                background-color: #45a049;
+            }
+            QPushButton:pressed {
+                background-color: #3d8b40;
+            }
+            QPushButton#clear_button {
+                background-color: #f44336;
+            }
+            QPushButton#clear_button:hover {
+                background-color: #d32f2f;
+            }
+        """)
+        
+        layout = QVBoxLayout(self)
+        
+        # عنوان
+        title_label = QLabel("مدل‌های دانلود شده")
+        title_label.setStyleSheet("font-size: 18px; font-weight: bold; color: #4CAF50; margin-bottom: 10px;")
+        layout.addWidget(title_label)
+        
+        # لیست مدل‌ها
+        self.models_list = QListWidget()
+        layout.addWidget(self.models_list)
+        
+        # دکمه‌ها
+        button_layout = QHBoxLayout()
+        
+        self.open_folder_button = QPushButton("📁 باز کردن فولدر")
+        self.open_folder_button.clicked.connect(self.open_models_folder)
+        button_layout.addWidget(self.open_folder_button)
+        
+        self.refresh_button = QPushButton("🔄 به‌روزرسانی")
+        self.refresh_button.clicked.connect(self.refresh_models)
+        button_layout.addWidget(self.refresh_button)
+        
+        self.clear_button = QPushButton("🗑️ پاک کردن همه")
+        self.clear_button.setObjectName("clear_button")
+        self.clear_button.clicked.connect(self.clear_all_models)
+        button_layout.addWidget(self.clear_button)
+        
+        layout.addLayout(button_layout)
+        
+        # دکمه بستن
+        close_button = QPushButton("بستن")
+        close_button.clicked.connect(self.accept)
+        layout.addWidget(close_button)
+        
+    def refresh_models(self):
+        """به‌روزرسانی لیست مدل‌های دانلود شده"""
+        self.models_list.clear()
+        
+        # بررسی مدل‌های Vosk
+        vosk_dir = Path.home() / ".vosk" / "models"
+        if vosk_dir.exists():
+            for model_dir in vosk_dir.iterdir():
+                if model_dir.is_dir():
+                    model_info = self.get_model_info("vosk", model_dir.name)
+                    if model_info:
+                        item_text = f"🎯 {model_info['name']} ({model_info['size']}) - {model_info['language']}"
+                        item = QListWidgetItem(item_text)
+                        item.setData(Qt.UserRole, ("vosk", model_dir.name, str(model_dir)))
+                        self.models_list.addItem(item)
+        
+        # بررسی مدل‌های Whisper
+        whisper_dir = Path.home() / ".cache" / "whisper"
+        if whisper_dir.exists():
+            for model_file in whisper_dir.glob("*.pt"):
+                model_name = model_file.stem
+                model_info = self.get_model_info("whisper", model_name)
+                if model_info:
+                    item_text = f"🎤 {model_info['name']} ({model_info['size']}) - {model_info['language']}"
+                    item = QListWidgetItem(item_text)
+                    item.setData(Qt.UserRole, ("whisper", model_name, str(model_file)))
+                    self.models_list.addItem(item)
+        
+        # بررسی مدل‌های Hugging Face
+        hf_cache_dir = Path.home() / ".cache" / "huggingface" / "hub"
+        if hf_cache_dir.exists():
+            for model_dir in hf_cache_dir.iterdir():
+                if model_dir.is_dir():
+                    # استخراج نام مدل از نام فولدر
+                    model_name = model_dir.name.replace("--", "/")
+                    model_info = self.get_model_info("huggingface", model_name)
+                    if model_info:
+                        item_text = f"🤗 {model_info['name']} ({model_info['size']}) - {model_info['language']}"
+                        item = QListWidgetItem(item_text)
+                        item.setData(Qt.UserRole, ("huggingface", model_name, str(model_dir)))
+                        self.models_list.addItem(item)
+        
+        # نمایش تعداد مدل‌ها
+        count = self.models_list.count()
+        if count == 0:
+            self.models_list.addItem("هیچ مدلی دانلود نشده است.")
+        else:
+            self.models_list.insertItem(0, f"تعداد مدل‌های دانلود شده: {count}")
+            
+    def get_model_info(self, model_type, model_name):
+        """دریافت اطلاعات مدل"""
+        for model_id, info in ModelDownloader.DOWNLOADABLE_MODELS.items():
+            if info["type"] == model_type.title():
+                if model_type == "whisper":
+                    whisper_name = model_id.replace("whisper_", "")
+                    if whisper_name == "large_v2":
+                        whisper_name = "large-v2"
+                    elif whisper_name == "large_v3":
+                        whisper_name = "large-v3"
+                    if whisper_name == model_name:
+                        return info
+                elif model_type == "vosk":
+                    if info["name"] == model_name:
+                        return info
+                elif model_type == "huggingface":
+                    # استخراج نام مدل از URL
+                    model_url = info["url"]
+                    if model_url.startswith("huggingface://"):
+                        hf_model_name = model_url.replace("huggingface://", "")
+                        if hf_model_name == model_name:
+                            return info
+        return None
+        
+    def open_models_folder(self):
+        """باز کردن فولدر مدل‌ها"""
+        import subprocess
+        import platform
+        import os
+        
+        current_item = self.models_list.currentItem()
+        if not current_item or not current_item.data(Qt.UserRole):
+            # باز کردن فولدر اصلی - اول Vosk را چک کن
+            models_dir = Path.home() / ".vosk" / "models"
+            if not models_dir.exists():
+                models_dir = Path.home() / ".cache" / "whisper"
+                # اگر فولدر whisper هم وجود ندارد، آن را ایجاد کن
+                if not models_dir.exists():
+                    models_dir.mkdir(parents=True, exist_ok=True)
+        else:
+            model_type, model_name, model_path = current_item.data(Qt.UserRole)
+            models_dir = Path(model_path).parent
+        
+        # اطمینان از وجود فولدر
+        if not models_dir.exists():
+            try:
+                models_dir.mkdir(parents=True, exist_ok=True)
+            except Exception as e:
+                QMessageBox.warning(self, "خطا", f"نمی‌توان فولدر را ایجاد کرد:\n{str(e)}")
+                return
+        
+        try:
+            if platform.system() == "Windows":
+                # استفاده از os.startfile که بهتر کار می‌کند
+                os.startfile(str(models_dir))
+            elif platform.system() == "Darwin":  # macOS
+                subprocess.run(["open", str(models_dir)], check=True)
+            else:  # Linux
+                subprocess.run(["xdg-open", str(models_dir)], check=True)
+        except Exception as e:
+            # اگر os.startfile کار نکرد، از subprocess استفاده کن
+            try:
+                if platform.system() == "Windows":
+                    subprocess.run(["explorer", str(models_dir)], check=True)
+                elif platform.system() == "Darwin":
+                    subprocess.run(["open", str(models_dir)], check=True)
+                else:
+                    subprocess.run(["xdg-open", str(models_dir)], check=True)
+            except Exception as e2:
+                QMessageBox.warning(self, "خطا", f"نمی‌توان فولدر را باز کرد:\n{str(e2)}")
+            
+    def clear_all_models(self):
+        """پاک کردن همه مدل‌ها"""
+        reply = QMessageBox.question(
+            self, "تأیید پاک کردن", 
+            "آیا مطمئن هستید که می‌خواهید همه مدل‌های دانلود شده را پاک کنید؟\nاین عمل قابل بازگشت نیست!",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No
+        )
+        
+        if reply == QMessageBox.Yes:
+            try:
+                # پاک کردن مدل‌های Vosk
+                vosk_dir = Path.home() / ".vosk" / "models"
+                if vosk_dir.exists():
+                    import shutil
+                    shutil.rmtree(vosk_dir)
+                
+                # پاک کردن مدل‌های Whisper
+                whisper_dir = Path.home() / ".cache" / "whisper"
+                if whisper_dir.exists():
+                    import shutil
+                    shutil.rmtree(whisper_dir)
+                
+                # پاک کردن مدل‌های Hugging Face
+                hf_cache_dir = Path.home() / ".cache" / "huggingface"
+                if hf_cache_dir.exists():
+                    import shutil
+                    shutil.rmtree(hf_cache_dir)
+                
+                QMessageBox.information(self, "موفق", "همه مدل‌های دانلود شده پاک شدند.")
+                self.refresh_models()
+                
+            except Exception as e:
+                QMessageBox.critical(self, "خطا", f"خطا در پاک کردن مدل‌ها:\n{str(e)}")
 
 class ModelSelectionDialog(QDialog):
     def __init__(self, parent=None):
@@ -2208,6 +2746,27 @@ class VoiceApp(QWidget):
         self.btn_manage_dict.clicked.connect(self.open_dict_manager)
         self.layout.addWidget(self.btn_manage_dict)
 
+        # دکمه مدیریت مدل‌های دانلود شده
+        self.btn_manage_models = QPushButton("📦 مدیریت مدل‌های دانلود شده")
+        self.btn_manage_models.setMinimumHeight(40)
+        self.btn_manage_models.setStyleSheet("""
+            QPushButton {
+                background-color: #FF9800; 
+                color: white; 
+                font-weight: bold;
+                border: none;
+                border-radius: 6px;
+            }
+            QPushButton:hover {
+                background-color: #F57C00;
+            }
+            QPushButton:pressed {
+                background-color: #E65100;
+            }
+        """)
+        self.btn_manage_models.clicked.connect(self.open_models_manager)
+        self.layout.addWidget(self.btn_manage_models)
+
         # Help menu button
         self.btn_help = QPushButton("📚 راهنما و تنظیمات")
         self.btn_help.setMinimumHeight(40)
@@ -2395,6 +2954,10 @@ class VoiceApp(QWidget):
             # به‌روزرسانی نمایش مدل
             self.update_model_display()
             
+            # بررسی دانلود مدل
+            if not self.check_and_download_model():
+                return  # کاربر انصراف داد یا خطا رخ داد
+            
             # هشدار برای مدل‌های ضعیف
             if self.selected_model in ["whisper_tiny", "whisper_base"]:
                 reply = QMessageBox.question(
@@ -2431,9 +2994,52 @@ class VoiceApp(QWidget):
                 )
                 if reply == QMessageBox.No:
                     return  # کاربر انصراف داد
+            
+            # شروع کانورت
+            self.start_conversion()
         else:
             return  # کاربر cancel کرد
 
+    def check_and_download_model(self):
+        """بررسی و دانلود مدل در صورت نیاز"""
+        # بررسی اینکه آیا مدل نیاز به دانلود دارد
+        if self.selected_model not in ModelDownloader.DOWNLOADABLE_MODELS:
+            return True  # مدل آنلاین است یا نیازی به دانلود ندارد
+        
+        model_info = ModelDownloader.DOWNLOADABLE_MODELS[self.selected_model]
+        
+        # بررسی اینکه آیا مدل قبلاً دانلود شده
+        if ModelDownloader.is_model_downloaded(self.selected_model):
+            return True  # مدل قبلاً دانلود شده
+        
+        # نمایش پیام تأیید دانلود
+        reply = QMessageBox.question(
+            self, "دانلود مدل", 
+            f"مدل {model_info['name']} ({model_info['size']}) دانلود نشده است.\n\nآیا می‌خواهید آن را دانلود کنید؟",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.Yes
+        )
+        
+        if reply == QMessageBox.No:
+            return False  # کاربر انصراف داد
+        
+        # نمایش دیالوگ دانلود با نوار پیشرفت
+        download_dialog = ModelDownloadDialog(self.selected_model, model_info, self)
+        download_dialog.start_download()  # شروع دانلود
+        if download_dialog.exec() == QDialog.Accepted:
+            # بعد از اتمام دانلود، از کاربر بپرس که آیا می‌خواهد کانورت را شروع کند
+            reply = QMessageBox.question(
+                self, "شروع کانورت", 
+                f"مدل {model_info['name']} با موفقیت دانلود شد.\n\nآیا می‌خواهید کانورت را شروع کنید؟",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.Yes
+            )
+            return reply == QMessageBox.Yes
+        else:
+            return False  # دانلود لغو شد
+
+    def start_conversion(self):
+        """شروع فرآیند کانورت"""
         self.text_edit.clear()
         self.output_file = None
         self.thread = TranscribeThread(self.audio_path, self.selected_model)
@@ -2513,6 +3119,11 @@ class VoiceApp(QWidget):
         self.dict_manager_window.show()
         self.dict_manager_window.raise_()
         self.dict_manager_window.activateWindow()
+
+    def open_models_manager(self):
+        """باز کردن پنجره مدیریت مدل‌های دانلود شده"""
+        dialog = DownloadedModelsManager(self)
+        dialog.exec()
 
     def change_model(self):
         """تغییر مدل بدون شروع transcription"""
