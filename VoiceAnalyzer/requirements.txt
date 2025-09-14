@@ -20,6 +20,8 @@ pip install librosa
 pip install scipy
 pip install huggingface_hub
 pip install PocketSphinx
+pip install omegaconf
 
-# Optional dependencies for better performance
-pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+# Silero STT Dependencies (install in order)
+pip install omegaconf
+pip install torch torchaudio --index-url https://download.pytorch.org/whl/cpu

@@ -32,6 +32,7 @@ except ImportError:
     PERSIAN_TOOLS_AVAILABLE = False
     print("Warning: persiantools not installed. Install with: pip install persiantools")
 
+
 # Google Speech-to-Text
 try:
     from google.cloud import speech
@@ -86,10 +87,17 @@ except ImportError:
 try:
     import torch
     import torchaudio
+    import torch.hub
+    import omegaconf
     SILERO_AVAILABLE = True
-except ImportError:
+except ImportError as e:
     SILERO_AVAILABLE = False
-    print("Warning: torchaudio not installed. Install with: pip install torchaudio")
+    print(f"Warning: Silero STT dependencies not available: {e}")
+    print("To install Silero STT dependencies:")
+    print("1. First install omegaconf: pip install omegaconf")
+    print("2. Then install PyTorch:")
+    print("   For CPU: pip install torch torchaudio --index-url https://download.pytorch.org/whl/cpu")
+    print("   For GPU: pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu118")
 
 # Kaldi
 try:
@@ -130,6 +138,7 @@ if not CONFIG_FILE.exists():
 
 # Import پنجره مدیریت دیکشنری
 from custom_dict_manager import DictManager
+
 
 class ConfigManager:
     """مدیریت تنظیمات برنامه"""
@@ -978,36 +987,28 @@ class ModelSelectionDialog(QDialog):
             return current_item.data(Qt.UserRole)
         return None
 
+
 def improve_persian_text(text):
-    """بهبود متن فارسی با تصحیح خودکار"""
-    if not PERSIAN_TOOLS_AVAILABLE:
+    """بهبود متن فارسی با تصحیح خودکار ساده"""
+    if not text or not text.strip():
         return text
     
-    # حذف تکرارهای اضافی کلمات
-    words = text.split()
-    cleaned_words = []
-    prev_word = None
-    repeat_count = 0
-    
-    for word in words:
-        if word == prev_word:
-            repeat_count += 1
-            if repeat_count < 3:  # حداکثر 3 تکرار مجاز
-                cleaned_words.append(word)
-        else:
-            repeat_count = 0
-            cleaned_words.append(word)
-        prev_word = word
-    
-    text = " ".join(cleaned_words)
-    
     # تصحیح کاراکترهای فارسی
-    text = characters.ar_to_fa(text)  # تبدیل عربی به فارسی
+    if PERSIAN_TOOLS_AVAILABLE:
+        text = characters.ar_to_fa(text)  # تبدیل عربی به فارسی
+        text = digits.en_to_fa(text)  # تبدیل اعداد انگلیسی به فارسی
     
-    # تصحیح اعداد
-    text = digits.en_to_fa(text)  # تبدیل اعداد انگلیسی به فارسی
+    # تصحیح فاصله‌گذاری ساده
+    text = text.replace("  ", " ")  # حذف فاصله‌های اضافی
+    text = text.replace(" .", ".")  # تصحیح نقطه
+    text = text.replace(" ,", ",")  # تصحیح ویرگول
+    text = text.replace(" :", ":")  # تصحیح دو نقطه
+    text = text.replace(" ;", ";")  # تصحیح نقطه‌ویرگول
+    text = text.replace(" !", "!")  # تصحیح علامت تعجب
+    text = text.replace(" ?", "?")  # تصحیح علامت سوال
     
-    return text
+    return text.strip()
+
 
 class TranscribeThread(QThread):
     progress = Signal(int)
@@ -1695,14 +1696,47 @@ set API_KEY_NAME=your_key_here
     def transcribe_with_silero(self, audio_file):
         """تبدیل صوت به متن با Silero STT"""
         try:
+            if not SILERO_AVAILABLE:
+                return """Silero STT Error: Dependencies not installed
+
+برای نصب Silero STT:
+
+1. ابتدا omegaconf را نصب کنید:
+   pip install omegaconf
+
+2. سپس PyTorch را نصب کنید:
+   برای CPU: pip install torch torchaudio --index-url https://download.pytorch.org/whl/cpu
+   برای GPU: pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu118
+
+3. سپس برنامه را دوباره اجرا کنید
+
+یا از مدل‌های دیگر استفاده کنید:
+• Vosk Persian (بهترین برای فارسی)
+• Whisper Medium/Large (چند زبانه)
+• Google Speech (آنلاین)
+"""
+            
             import torch
             import torchaudio
             
+            # بررسی نسخه PyTorch
+            torch_version = torch.__version__
+            
             # بارگذاری مدل
             if self.model_name == "silero_stt_en":
-                model, decoder, utils = torch.hub.load(repo_or_dir='snakers4/silero-models', model='silero_stt', language='en')
+                model, decoder, utils = torch.hub.load(
+                    repo_or_dir='snakers4/silero-models', 
+                    model='silero_stt', 
+                    language='en',
+                    force_reload=False
+                )
             else:  # silero_stt_multilingual
-                model, decoder, utils = torch.hub.load(repo_or_dir='snakers4/silero-models', model='silero_stt', language='multilingual')
+                model, decoder, utils = torch.hub.load(
+                    repo_or_dir='snakers4/silero-models', 
+                    model='silero_stt', 
+                    language='multilingual',
+                    force_reload=False
+                )
             
             # بارگذاری فایل صوتی
             audio, sample_rate = torchaudio.load(audio_file)
@@ -1716,10 +1750,52 @@ set API_KEY_NAME=your_key_here
             
             return text.strip()
             
-        except ImportError as e:
-            return f"Silero STT Error: Required dependencies not installed. Install with: pip install torch torchaudio"
         except Exception as e:
-            return f"Silero STT Error: {str(e)}"
+            error_msg = str(e)
+            if "No module named 'torch'" in error_msg:
+                return """Silero STT Error: PyTorch not installed
+
+برای نصب PyTorch:
+
+1. ابتدا omegaconf را نصب کنید:
+   pip install omegaconf
+
+2. سپس PyTorch را نصب کنید:
+   برای CPU: pip install torch torchaudio --index-url https://download.pytorch.org/whl/cpu
+   برای GPU: pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu118
+
+سپس برنامه را دوباره اجرا کنید.
+"""
+            elif "No module named 'torchaudio'" in error_msg:
+                return """Silero STT Error: TorchAudio not installed
+
+برای نصب TorchAudio:
+
+1. ابتدا omegaconf را نصب کنید:
+   pip install omegaconf
+
+2. سپس PyTorch را نصب کنید:
+   برای CPU: pip install torch torchaudio --index-url https://download.pytorch.org/whl/cpu
+   برای GPU: pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu118
+
+سپس برنامه را دوباره اجرا کنید.
+"""
+            elif "No module named 'omegaconf'" in error_msg:
+                return """Silero STT Error: OmegaConf not installed
+
+برای نصب OmegaConf:
+
+1. ابتدا omegaconf را نصب کنید:
+   pip install omegaconf
+
+2. سپس PyTorch را نصب کنید:
+   برای CPU: pip install torch torchaudio --index-url https://download.pytorch.org/whl/cpu
+   برای GPU: pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu118
+
+سپس برنامه را دوباره اجرا کنید.
+"""
+            else:
+                return f"Silero STT Error: {error_msg}\n\nلطفاً از مدل‌های دیگر استفاده کنید:\n• Vosk Persian (بهترین برای فارسی)\n• Whisper Medium/Large (چند زبانه)\n• Google Speech (آنلاین)"
     
     def transcribe_with_kaldi(self, audio_file):
         """تبدیل صوت به متن با Kaldi"""
@@ -1887,6 +1963,13 @@ class VoiceApp(QWidget):
         self.btn_speechrecognition_setup.setStyleSheet("background-color: #2196F3; color: white;")
         self.btn_speechrecognition_setup.clicked.connect(self.show_speechrecognition_setup_guide)
         self.layout.addWidget(self.btn_speechrecognition_setup)
+
+
+        self.btn_install_pytorch = QPushButton("نصب PyTorch (برای Silero)")
+        self.btn_install_pytorch.setMinimumHeight(40)
+        self.btn_install_pytorch.setStyleSheet("background-color: #9C27B0; color: white;")
+        self.btn_install_pytorch.clicked.connect(self.show_pytorch_install_guide)
+        self.layout.addWidget(self.btn_install_pytorch)
 
         self.progress = QProgressBar()
         self.layout.addWidget(self.progress)
@@ -2603,6 +2686,114 @@ class VoiceApp(QWidget):
         layout.addLayout(button_layout)
         
         dialog.exec()
+    
+    
+    def show_pytorch_install_guide(self):
+        """نمایش راهنمای نصب PyTorch"""
+        from PySide6.QtWidgets import QDialog, QVBoxLayout, QTextEdit, QPushButton, QHBoxLayout
+        from PySide6.QtCore import Qt
+        
+        dialog = QDialog(self)
+        dialog.setWindowTitle("راهنمای نصب PyTorch برای Silero STT")
+        dialog.setModal(True)
+        dialog.resize(700, 600)
+        
+        layout = QVBoxLayout(dialog)
+        
+        # متن راهنما
+        text_edit = QTextEdit()
+        text_edit.setReadOnly(True)
+        text_edit.setHtml("""
+        <h2>راهنمای نصب PyTorch برای Silero STT</h2>
+        
+        <h3>🔧 مراحل نصب:</h3>
+        
+        <h4>1️⃣ تشخیص نوع سیستم:</h4>
+        <p>ابتدا نوع سیستم خود را تشخیص دهید:</p>
+        <p>• <strong>CPU:</strong> اگر کارت گرافیک ندارید یا نمی‌خواهید از GPU استفاده کنید</p>
+        <p>• <strong>GPU:</strong> اگر کارت گرافیک NVIDIA دارید و می‌خواهید از آن استفاده کنید</p>
+        
+        <h4>2️⃣ نصب omegaconf:</h4>
+        <p>ابتدا omegaconf را نصب کنید:</p>
+        <p><code>pip install omegaconf</code></p>
+        
+        <h4>3️⃣ نصب برای CPU:</h4>
+        <p>در Command Prompt یا Terminal اجرا کنید:</p>
+        <p><code>pip install torch torchaudio --index-url https://download.pytorch.org/whl/cpu</code></p>
+        
+        <h4>4️⃣ نصب برای GPU (CUDA 11.8):</h4>
+        <p>در Command Prompt یا Terminal اجرا کنید:</p>
+        <p><code>pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu118</code></p>
+        
+        <h4>5️⃣ نصب برای GPU (CUDA 12.1):</h4>
+        <p>در Command Prompt یا Terminal اجرا کنید:</p>
+        <p><code>pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu121</code></p>
+        
+        <h4>6️⃣ بررسی نصب:</h4>
+        <p>برای بررسی نصب، در Python اجرا کنید:</p>
+        <p><code>import torch</code></p>
+        <p><code>print(torch.__version__)</code></p>
+        <p><code>print(torch.cuda.is_available())  # برای GPU</code></p>
+        
+        <h3>💡 نکات مهم:</h3>
+        <p>• اگر قبلاً PyTorch نصب کرده‌اید، ابتدا آن را حذف کنید:</p>
+        <p><code>pip uninstall torch torchaudio</code></p>
+        <p>• سپس دستور نصب جدید را اجرا کنید</p>
+        <p>• پس از نصب، برنامه را دوباره اجرا کنید</p>
+        
+        <h3>🚨 مشکلات رایج:</h3>
+        <p>• <strong>خطای "No module named 'torch'":</strong> PyTorch نصب نشده است</p>
+        <p>• <strong>خطای "No module named 'torchaudio'":</strong> TorchAudio نصب نشده است</p>
+        <p>• <strong>خطای CUDA:</strong> نسخه CUDA با PyTorch سازگار نیست</p>
+        
+        <h3>🔗 لینک‌های مفید:</h3>
+        <p>• <a href="https://pytorch.org/get-started/locally/">راهنمای رسمی PyTorch</a></p>
+        <p>• <a href="https://pytorch.org/get-started/previous-versions/">نسخه‌های قبلی PyTorch</a></p>
+        <p>• <a href="https://github.com/snakers4/silero-models">Silero Models</a></p>
+        """)
+        
+        layout.addWidget(text_edit)
+        
+        # دکمه‌ها
+        button_layout = QHBoxLayout()
+        
+        copy_cpu_btn = QPushButton("کپی دستور CPU")
+        copy_cpu_btn.setStyleSheet("background-color: #4CAF50; color: white; padding: 8px;")
+        copy_omegaconf_btn = QPushButton("کپی دستور omegaconf")
+        copy_omegaconf_btn.setStyleSheet("background-color: #4CAF50; color: white; padding: 8px;")
+        copy_omegaconf_btn.clicked.connect(lambda: self.copy_to_clipboard("pip install omegaconf"))
+        
+        copy_cpu_btn = QPushButton("کپی دستور CPU")
+        copy_cpu_btn.setStyleSheet("background-color: #2196F3; color: white; padding: 8px;")
+        copy_cpu_btn.clicked.connect(lambda: self.copy_to_clipboard("pip install torch torchaudio --index-url https://download.pytorch.org/whl/cpu"))
+        
+        copy_gpu_btn = QPushButton("کپی دستور GPU")
+        copy_gpu_btn.setStyleSheet("background-color: #FF9800; color: white; padding: 8px;")
+        copy_gpu_btn.clicked.connect(lambda: self.copy_to_clipboard("pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu118"))
+        
+        open_pytorch_btn = QPushButton("باز کردن PyTorch")
+        open_pytorch_btn.setStyleSheet("background-color: #2196F3; color: white; padding: 8px;")
+        open_pytorch_btn.clicked.connect(lambda: webbrowser.open("https://pytorch.org/get-started/locally/"))
+        
+        close_btn = QPushButton("بستن")
+        close_btn.clicked.connect(dialog.accept)
+        
+        button_layout.addWidget(copy_omegaconf_btn)
+        button_layout.addWidget(copy_cpu_btn)
+        button_layout.addWidget(copy_gpu_btn)
+        button_layout.addWidget(open_pytorch_btn)
+        button_layout.addWidget(close_btn)
+        
+        layout.addLayout(button_layout)
+        
+        dialog.exec()
+    
+    def copy_to_clipboard(self, text):
+        """کپی متن به کلیپ‌بورد"""
+        from PySide6.QtWidgets import QApplication
+        clipboard = QApplication.clipboard()
+        clipboard.setText(text)
+        QMessageBox.information(self, "کپی شد", f"دستور کپی شد:\n{text}")
     
     def download_selected_model(self, dialog):
         """دانلود مدل انتخاب شده"""

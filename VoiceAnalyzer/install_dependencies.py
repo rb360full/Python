@@ -49,12 +49,17 @@ def main():
     # لیست وابستگی‌های مدل‌های جدید
     new_model_packages = [
         "transformers",
-        "torch",
         "SpeechRecognition",
-        "torchaudio",
         "kaldi-io",
         "librosa",
-        "scipy"
+        "scipy",
+        "omegaconf"
+    ]
+    
+    # لیست وابستگی‌های Silero STT (نصب جداگانه)
+    silero_packages = [
+        "torch",
+        "torchaudio"
     ]
     
     print("📦 نصب وابستگی‌های اصلی...")
@@ -75,12 +80,20 @@ def main():
         if install_package(package):
             new_model_success += 1
     
+    print(f"\n📦 نصب وابستگی‌های Silero STT...")
+    print("⚠️ توجه: PyTorch و TorchAudio نیاز به نصب جداگانه دارند")
+    print("برای نصب Silero STT:")
+    print("1. ابتدا: pip install omegaconf")
+    print("2. سپس: pip install torch torchaudio --index-url https://download.pytorch.org/whl/cpu")
+    silero_success = 0
+    
     # خلاصه نتایج
     print("\n" + "=" * 50)
     print("📊 خلاصه نصب:")
     print(f"✅ وابستگی‌های اصلی: {core_success}/{len(core_packages)}")
     print(f"✅ وابستگی‌های Speech-to-Text: {speech_success}/{len(speech_packages)}")
     print(f"✅ وابستگی‌های مدل‌های جدید: {new_model_success}/{len(new_model_packages)}")
+    print(f"⚠️ وابستگی‌های Silero STT: نیاز به نصب دستی")
     
     total_success = core_success + speech_success + new_model_success
     total_packages = len(core_packages) + len(speech_packages) + len(new_model_packages)

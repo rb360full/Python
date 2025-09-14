@@ -1,9 +1,9 @@
 {
-  "selected_model": "hf_wav2vec2_persian",
+  "selected_model": "silero_stt_multilingual",
   "last_audio_path": "C:/Users/Reza/Desktop/_ALI/02.ogg",
   "window_geometry": {
     "x": 510,
-    "y": 92,
+    "y": -1,
     "width": 900,
     "height": 732
   },
