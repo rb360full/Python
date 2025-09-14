@@ -18,6 +18,8 @@ pip install torchaudio
 pip install kaldi-io
 pip install librosa
 pip install scipy
+pip install huggingface_hub
+pip install PocketSphinx
 
 # Optional dependencies for better performance
 pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu

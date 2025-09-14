@@ -1,9 +1,9 @@
 {
-  "selected_model": "kaldi_persian",
+  "selected_model": "speechrecognition_wit",
   "last_audio_path": "C:/Users/Reza/Desktop/_ALI/02.ogg",
   "window_geometry": {
     "x": 510,
-    "y": 154,
+    "y": 123,
     "width": 900,
     "height": 600
   },

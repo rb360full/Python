@@ -285,6 +285,14 @@ class ModelDownloader:
             "warning": "✅ مخصوص فارسی - Hugging Face",
             "type": "HuggingFace"
         },
+        "hf_wav2vec2_persian_alt": {
+            "url": "huggingface://facebook/wav2vec2-large-xlsr-53",
+            "name": "wav2vec2-large-xlsr-53",
+            "size": "1.2 GB",
+            "language": "چند زبانه",
+            "warning": "⚠️ چند زبانه - نیاز به fine-tuning برای فارسی",
+            "type": "HuggingFace"
+        },
         "hf_whisper_tiny": {
             "url": "huggingface://openai/whisper-tiny",
             "name": "whisper-tiny-hf",
@@ -408,7 +416,7 @@ class ModelDownloader:
             "name": "Kaldi Persian Model",
             "size": "500 MB",
             "language": "فارسی",
-            "warning": "✅ مخصوص فارسی",
+            "warning": "🚧 در حال توسعه - از Vosk Persian استفاده کنید",
             "type": "Kaldi"
         },
         "kaldi_english": {
@@ -416,7 +424,7 @@ class ModelDownloader:
             "name": "Kaldi English Model",
             "size": "300 MB",
             "language": "انگلیسی",
-            "warning": "⚠️ فقط انگلیسی",
+            "warning": "🚧 در حال توسعه - از Vosk استفاده کنید",
             "type": "Kaldi"
         },
         
@@ -614,6 +622,7 @@ class ModelSelectionDialog(QDialog):
             # Hugging Face Transformers
             ("hf_wav2vec2_persian", "✅ Wav2Vec2 Persian - مخصوص فارسی (1.2 GB)"),
             ("hf_whisper_persian", "✅ Whisper Persian - مخصوص فارسی (1.5 GB)"),
+            ("hf_wav2vec2_persian_alt", "⚠️ Wav2Vec2 Multilingual - چند زبانه (1.2 GB)"),
             ("hf_whisper_tiny", "⚠️ Whisper Tiny HF - ضعیف برای فارسی (75 MB)"),
             ("hf_whisper_base", "⚠️ Whisper Base HF - ضعیف برای فارسی (142 MB)"),
             ("hf_whisper_small", "✅ Whisper Small HF - تعادل خوب (466 MB)"),
@@ -634,8 +643,8 @@ class ModelSelectionDialog(QDialog):
             ("silero_stt_multilingual", "✅ Silero STT Multilingual - پشتیبانی از فارسی (200 MB)"),
             
             # Kaldi
-            ("kaldi_persian", "✅ Kaldi Persian - مخصوص فارسی (500 MB)"),
-            ("kaldi_english", "⚠️ Kaldi English - فقط انگلیسی (300 MB)"),
+            ("kaldi_persian", "🚧 Kaldi Persian - در حال توسعه (500 MB)"),
+            ("kaldi_english", "🚧 Kaldi English - در حال توسعه (300 MB)"),
             
             # سرویس‌های بومی ایرانی
             ("iranian_arvan", "🇮🇷 Arvan Cloud Speech - سرویس ایرانی (آنلاین)"),
@@ -1109,13 +1118,71 @@ class TranscribeThread(QThread):
         try:
             # بارگذاری مدل بر اساس نوع
             if self.model_name == "hf_wav2vec2_persian":
-                model_name = "m3hrdadfi/wav2vec2-large-xlsr-53-persian"
-                processor = AutoProcessor.from_pretrained(model_name)
-                model = AutoModelForCTC.from_pretrained(model_name)
+                # تلاش برای بارگذاری مدل فارسی
+                try:
+                    model_name = "m3hrdadfi/wav2vec2-large-xlsr-53-persian"
+                    processor = AutoProcessor.from_pretrained(model_name)
+                    model = AutoModelForCTC.from_pretrained(model_name)
+                except Exception as e:
+                    # اگر مدل فارسی در دسترس نباشد، از مدل عمومی استفاده کن
+                    error_msg = str(e)
+                    if "not a valid model identifier" in error_msg:
+                        return f"""Hugging Face Error: مدل فارسی در دسترس نیست
+
+مشکل: مدل m3hrdadfi/wav2vec2-large-xlsr-53-persian یافت نشد
+
+راه‌حل‌ها:
+1. اتصال اینترنت خود را بررسی کنید
+2. از مدل‌های جایگزین استفاده کنید:
+   • Vosk Persian (بهترین برای فارسی)
+   • Whisper Medium/Large (چند زبانه)
+   • Wav2Vec2 Multilingual (Hugging Face)
+
+برای استفاده از Hugging Face:
+1. به https://huggingface.co بروید
+2. حساب کاربری بسازید
+3. از دستور زیر استفاده کنید:
+   hf auth login
+"""
+                    else:
+                        return f"Hugging Face Error: {error_msg}. لطفاً از Vosk Persian یا Whisper استفاده کنید."
+                    
             elif self.model_name == "hf_whisper_persian":
-                model_name = "m3hrdadfi/whisper-persian"
-                processor = AutoProcessor.from_pretrained(model_name)
-                model = AutoModelForCTC.from_pretrained(model_name)
+                # تلاش برای بارگذاری مدل Whisper فارسی
+                try:
+                    model_name = "m3hrdadfi/whisper-persian"
+                    processor = AutoProcessor.from_pretrained(model_name)
+                    model = AutoModelForCTC.from_pretrained(model_name)
+                except Exception as e:
+                    error_msg = str(e)
+                    if "not a valid model identifier" in error_msg:
+                        return f"""Hugging Face Error: مدل Whisper فارسی در دسترس نیست
+
+مشکل: مدل m3hrdadfi/whisper-persian یافت نشد
+
+راه‌حل‌ها:
+1. از مدل‌های جایگزین استفاده کنید:
+   • Whisper Medium/Large (چند زبانه)
+   • Vosk Persian (بهترین برای فارسی)
+   • Whisper عادی (Hugging Face)
+
+برای استفاده از Hugging Face:
+1. به https://huggingface.co بروید
+2. حساب کاربری بسازید
+3. از دستور زیر استفاده کنید:
+   hf auth login
+"""
+                    else:
+                        return f"Hugging Face Error: {error_msg}. لطفاً از Whisper عادی استفاده کنید."
+                    
+            elif self.model_name == "hf_wav2vec2_persian_alt":
+                # استفاده از مدل عمومی wav2vec2
+                try:
+                    model_name = "facebook/wav2vec2-large-xlsr-53"
+                    processor = AutoProcessor.from_pretrained(model_name)
+                    model = AutoModelForCTC.from_pretrained(model_name)
+                except Exception as e:
+                    return f"Hugging Face Error: مدل wav2vec2 در دسترس نیست ({str(e)}). لطفاً از مدل‌های دیگر استفاده کنید."
             else:
                 # مدل‌های عمومی Whisper
                 model_name = self.model_name.replace("hf_", "").replace("_hf", "")
@@ -1124,8 +1191,11 @@ class TranscribeThread(QThread):
                 else:
                     model_name = f"openai/whisper-{model_name}"
                 
-                processor = AutoProcessor.from_pretrained(model_name)
-                model = AutoModelForCTC.from_pretrained(model_name)
+                try:
+                    processor = AutoProcessor.from_pretrained(model_name)
+                    model = AutoModelForCTC.from_pretrained(model_name)
+                except Exception as e:
+                    return f"Hugging Face Error: مدل {model_name} در دسترس نیست ({str(e)}). لطفاً از مدل‌های دیگر استفاده کنید."
             
             # بارگذاری فایل صوتی
             try:
@@ -1176,24 +1246,124 @@ class TranscribeThread(QThread):
             if self.model_name == "speechrecognition_google":
                 text = r.recognize_google(audio, language="fa-IR")
             elif self.model_name == "speechrecognition_sphinx":
-                text = r.recognize_sphinx(audio)
+                try:
+                    text = r.recognize_sphinx(audio)
+                except Exception as e:
+                    if "missing PocketSphinx module" in str(e):
+                        return """SpeechRecognition Error: PocketSphinx not installed
+
+برای استفاده از CMU Sphinx:
+1. PocketSphinx را نصب کنید:
+   pip install PocketSphinx
+2. یا از Google Speech استفاده کنید (رایگان)
+
+CMU Sphinx فقط انگلیسی را پشتیبانی می‌کند.
+"""
+                    else:
+                        return f"SpeechRecognition Error: {str(e)}"
             elif self.model_name == "speechrecognition_wit":
-                text = r.recognize_wit(audio, key=os.getenv("WIT_AI_KEY"))
+                api_key = os.getenv("WIT_AI_KEY")
+                if not api_key:
+                    return """SpeechRecognition Error: Wit.ai API Key not found
+
+برای استفاده از Wit.ai:
+1. به https://wit.ai بروید
+2. حساب کاربری بسازید
+3. API Key دریافت کنید
+4. متغیر محیطی تنظیم کنید:
+   set WIT_AI_KEY=your_key_here
+
+یا از Google Speech استفاده کنید (رایگان)
+"""
+                text = r.recognize_wit(audio, key=api_key)
             elif self.model_name == "speechrecognition_azure":
-                text = r.recognize_azure(audio, key=os.getenv("AZURE_SPEECH_KEY"), location=os.getenv("AZURE_SPEECH_REGION"))
+                api_key = os.getenv("AZURE_SPEECH_KEY")
+                region = os.getenv("AZURE_SPEECH_REGION")
+                if not api_key or not region:
+                    return """SpeechRecognition Error: Azure Speech API Key not found
+
+برای استفاده از Azure Speech:
+1. به https://portal.azure.com بروید
+2. Cognitive Services > Speech ایجاد کنید
+3. API Key و Region دریافت کنید
+4. متغیرهای محیطی تنظیم کنید:
+   set AZURE_SPEECH_KEY=your_key_here
+   set AZURE_SPEECH_REGION=your_region_here
+
+یا از Google Speech استفاده کنید (رایگان)
+"""
+                text = r.recognize_azure(audio, key=api_key, location=region)
             elif self.model_name == "speechrecognition_bing":
-                text = r.recognize_bing(audio, key=os.getenv("BING_KEY"))
+                api_key = os.getenv("BING_KEY")
+                if not api_key:
+                    return """SpeechRecognition Error: Bing Speech API Key not found
+
+برای استفاده از Bing Speech:
+1. به https://azure.microsoft.com بروید
+2. Bing Speech API فعال کنید
+3. API Key دریافت کنید
+4. متغیر محیطی تنظیم کنید:
+   set BING_KEY=your_key_here
+
+یا از Google Speech استفاده کنید (رایگان)
+"""
+                text = r.recognize_bing(audio, key=api_key)
             elif self.model_name == "speechrecognition_houndify":
-                text = r.recognize_houndify(audio, client_id=os.getenv("HOUNDIFY_CLIENT_ID"), client_key=os.getenv("HOUNDIFY_CLIENT_KEY"))
+                client_id = os.getenv("HOUNDIFY_CLIENT_ID")
+                client_key = os.getenv("HOUNDIFY_CLIENT_KEY")
+                if not client_id or not client_key:
+                    return """SpeechRecognition Error: Houndify API Keys not found
+
+برای استفاده از Houndify:
+1. به https://www.houndify.com بروید
+2. حساب کاربری بسازید
+3. Client ID و Client Key دریافت کنید
+4. متغیرهای محیطی تنظیم کنید:
+   set HOUNDIFY_CLIENT_ID=your_client_id
+   set HOUNDIFY_CLIENT_KEY=your_client_key
+
+یا از Google Speech استفاده کنید (رایگان)
+"""
+                text = r.recognize_houndify(audio, client_id=client_id, client_key=client_key)
             elif self.model_name == "speechrecognition_ibm":
-                text = r.recognize_ibm(audio, username=os.getenv("IBM_USERNAME"), password=os.getenv("IBM_PASSWORD"))
+                username = os.getenv("IBM_USERNAME")
+                password = os.getenv("IBM_PASSWORD")
+                if not username or not password:
+                    return """SpeechRecognition Error: IBM Speech API Credentials not found
+
+برای استفاده از IBM Speech:
+1. به https://www.ibm.com/cloud/watson-speech-to-text بروید
+2. حساب کاربری بسازید
+3. Username و Password دریافت کنید
+4. متغیرهای محیطی تنظیم کنید:
+   set IBM_USERNAME=your_username
+   set IBM_PASSWORD=your_password
+
+یا از Google Speech استفاده کنید (رایگان)
+"""
+                text = r.recognize_ibm(audio, username=username, password=password)
             else:
                 return "SpeechRecognition Error: Unknown service"
             
             return text.strip()
             
         except Exception as e:
-            return f"SpeechRecognition Error: {str(e)}"
+            error_msg = str(e)
+            if "key must be a string" in error_msg:
+                return f"""SpeechRecognition Error: API Key مشکل دارد
+
+مشکل: کلید API به درستی تنظیم نشده است
+
+راه‌حل‌ها:
+1. متغیرهای محیطی را بررسی کنید
+2. API Key را دوباره تنظیم کنید
+3. از Google Speech استفاده کنید (رایگان)
+
+برای تنظیم متغیرهای محیطی:
+set API_KEY_NAME=your_key_here
+"""
+            else:
+                return f"SpeechRecognition Error: {error_msg}"
     
     def transcribe_with_silero(self, audio_file):
         """تبدیل صوت به متن با Silero STT"""
@@ -1231,18 +1401,74 @@ class TranscribeThread(QThread):
             if not KALDI_AVAILABLE:
                 return "Kaldi Error: kaldi-io not installed. Install with: pip install kaldi-io"
             
-            # برای Kaldi، ما از یک پیاده‌سازی ساده استفاده می‌کنیم
-            # که از مدل‌های موجود استفاده می‌کند
-            
+            # پیاده‌سازی ساده Kaldi با استفاده از مدل‌های موجود
             if self.model_name == "kaldi_persian":
-                # استفاده از مدل فارسی Kaldi (نیاز به مدل‌های Kaldi)
-                return "Kaldi Persian: مدل Kaldi فارسی نیاز به تنظیمات پیچیده دارد. لطفاً از مدل‌های دیگر استفاده کنید."
+                # برای Kaldi Persian، از یک مدل ساده استفاده می‌کنیم
+                # این یک پیاده‌سازی نمونه است که می‌تواند با مدل‌های واقعی Kaldi جایگزین شود
+                
+                # بارگذاری فایل صوتی
+                import soundfile as sf
+                audio, sample_rate = sf.read(audio_file)
+                
+                # تبدیل به mono اگر stereo باشد
+                if len(audio.shape) > 1:
+                    audio = audio.mean(axis=1)
+                
+                # تبدیل sample rate به 16000
+                if sample_rate != 16000:
+                    from scipy import signal
+                    audio = signal.resample(audio, int(len(audio) * 16000 / sample_rate))
+                    sample_rate = 16000
+                
+                # پیاده‌سازی ساده Kaldi
+                # این یک پیاده‌سازی نمونه است که می‌تواند با مدل‌های واقعی Kaldi جایگزین شود
+                
+                # برای حال حاضر، از یک مدل ساده استفاده می‌کنیم
+                # در آینده می‌توان مدل‌های Kaldi واقعی را اضافه کرد
+                
+                # محاسبه طول فایل صوتی
+                duration = len(audio) / sample_rate
+                
+                # پیام نمونه با اطلاعات فایل
+                result = f"Kaldi Persian: فایل صوتی پردازش شد (مدت: {duration:.2f} ثانیه)\n"
+                result += "مدل Kaldi فارسی در حال توسعه است.\n"
+                result += "برای استفاده از مدل‌های فارسی، لطفاً از گزینه‌های زیر استفاده کنید:\n"
+                result += "• Vosk Persian (بهترین برای فارسی)\n"
+                result += "• Whisper Medium/Large (چند زبانه)\n"
+                result += "• Wav2Vec2 Persian (Hugging Face)"
+                
+                return result
+                
             elif self.model_name == "kaldi_english":
-                # استفاده از مدل انگلیسی Kaldi
-                return "Kaldi English: مدل Kaldi انگلیسی نیاز به تنظیمات پیچیده دارد. لطفاً از مدل‌های دیگر استفاده کنید."
+                # برای Kaldi English
+                import soundfile as sf
+                audio, sample_rate = sf.read(audio_file)
+                
+                if len(audio.shape) > 1:
+                    audio = audio.mean(axis=1)
+                
+                if sample_rate != 16000:
+                    from scipy import signal
+                    audio = signal.resample(audio, int(len(audio) * 16000 / sample_rate))
+                    sample_rate = 16000
+                
+                # محاسبه طول فایل صوتی
+                duration = len(audio) / sample_rate
+                
+                # پیام نمونه با اطلاعات فایل
+                result = f"Kaldi English: فایل صوتی پردازش شد (مدت: {duration:.2f} ثانیه)\n"
+                result += "مدل Kaldi انگلیسی در حال توسعه است.\n"
+                result += "برای استفاده از مدل‌های انگلیسی، لطفاً از گزینه‌های زیر استفاده کنید:\n"
+                result += "• Vosk Small/Large (بهترین برای انگلیسی)\n"
+                result += "• Whisper (چند زبانه)\n"
+                result += "• Silero STT English"
+                
+                return result
             else:
                 return "Kaldi Error: Unknown Kaldi model"
             
+        except ImportError as e:
+            return f"Kaldi Error: Required dependencies not installed. Install with: pip install kaldi-io soundfile scipy"
         except Exception as e:
             return f"Kaldi Error: {str(e)}"
     
@@ -1322,6 +1548,18 @@ class VoiceApp(QWidget):
         self.btn_change_model.setStyleSheet("background-color: #9c27b0; color: white;")
         self.btn_change_model.clicked.connect(self.change_model)
         self.layout.addWidget(self.btn_change_model)
+
+        self.btn_huggingface_setup = QPushButton("Hugging Face Setup")
+        self.btn_huggingface_setup.setMinimumHeight(40)
+        self.btn_huggingface_setup.setStyleSheet("background-color: #ff6b35; color: white;")
+        self.btn_huggingface_setup.clicked.connect(self.show_huggingface_setup_guide)
+        self.layout.addWidget(self.btn_huggingface_setup)
+
+        self.btn_speechrecognition_setup = QPushButton("SpeechRecognition Setup")
+        self.btn_speechrecognition_setup.setMinimumHeight(40)
+        self.btn_speechrecognition_setup.setStyleSheet("background-color: #2196F3; color: white;")
+        self.btn_speechrecognition_setup.clicked.connect(self.show_speechrecognition_setup_guide)
+        self.layout.addWidget(self.btn_speechrecognition_setup)
 
         self.progress = QProgressBar()
         self.layout.addWidget(self.progress)
@@ -1798,6 +2036,191 @@ class VoiceApp(QWidget):
         button_layout.addWidget(download_btn)
         button_layout.addWidget(download_all_btn)
         button_layout.addWidget(download_whisper_btn)
+        button_layout.addWidget(close_btn)
+        
+        layout.addLayout(button_layout)
+        
+        dialog.exec()
+    
+    def show_huggingface_setup_guide(self):
+        """نمایش راهنمای تنظیم Hugging Face"""
+        from PySide6.QtWidgets import QDialog, QVBoxLayout, QTextEdit, QPushButton, QHBoxLayout
+        from PySide6.QtCore import Qt
+        
+        dialog = QDialog(self)
+        dialog.setWindowTitle("راهنمای تنظیم Hugging Face")
+        dialog.setModal(True)
+        dialog.resize(600, 500)
+        
+        layout = QVBoxLayout(dialog)
+        
+        # متن راهنما
+        text_edit = QTextEdit()
+        text_edit.setReadOnly(True)
+        text_edit.setHtml("""
+        <h2>راهنمای تنظیم Hugging Face</h2>
+        
+        <h3>🔧 مراحل تنظیم:</h3>
+        
+        <h4>1️⃣ ایجاد حساب کاربری:</h4>
+        <p>• به <a href="https://huggingface.co">Hugging Face</a> بروید</p>
+        <p>• روی "Sign Up" کلیک کنید</p>
+        <p>• حساب کاربری خود را بسازید</p>
+        
+        <h4>2️⃣ نصب Hugging Face CLI:</h4>
+        <p>• در Command Prompt اجرا کنید:</p>
+        <p><code>pip install huggingface_hub</code></p>
+        
+        <h4>3️⃣ ورود به حساب کاربری:</h4>
+        <p>• در Command Prompt اجرا کنید:</p>
+        <p><code>huggingface-cli login</code></p>
+        <p>• Token خود را وارد کنید</p>
+        
+        <h4>4️⃣ دریافت Token:</h4>
+        <p>• به <a href="https://huggingface.co/settings/tokens">Settings > Tokens</a> بروید</p>
+        <p>• "New token" کلیک کنید</p>
+        <p>• نام و دسترسی‌ها را انتخاب کنید</p>
+        <p>• Token را کپی کنید</p>
+        
+        <h3>💡 نکات مهم:</h3>
+        <p>• برخی مدل‌ها نیاز به احراز هویت دارند</p>
+        <p>• مدل‌های فارسی ممکن است در دسترس نباشند</p>
+        <p>• از مدل‌های جایگزین استفاده کنید</p>
+        
+        <h3>🔗 لینک‌های مفید:</h3>
+        <p>• <a href="https://huggingface.co">Hugging Face</a></p>
+        <p>• <a href="https://huggingface.co/models">مدل‌های موجود</a></p>
+        <p>• <a href="https://huggingface.co/docs/hub/quick-start">راهنمای سریع</a></p>
+        """)
+        
+        layout.addWidget(text_edit)
+        
+        # دکمه‌ها
+        button_layout = QHBoxLayout()
+        
+        open_hf_btn = QPushButton("باز کردن Hugging Face")
+        open_hf_btn.setStyleSheet("background-color: #ff6b35; color: white; padding: 8px;")
+        open_hf_btn.clicked.connect(lambda: webbrowser.open("https://huggingface.co"))
+        
+        open_tokens_btn = QPushButton("مدیریت Tokens")
+        open_tokens_btn.setStyleSheet("background-color: #4CAF50; color: white; padding: 8px;")
+        open_tokens_btn.clicked.connect(lambda: webbrowser.open("https://huggingface.co/settings/tokens"))
+        
+        close_btn = QPushButton("بستن")
+        close_btn.clicked.connect(dialog.accept)
+        
+        button_layout.addWidget(open_hf_btn)
+        button_layout.addWidget(open_tokens_btn)
+        button_layout.addWidget(close_btn)
+        
+        layout.addLayout(button_layout)
+        
+        dialog.exec()
+    
+    def show_speechrecognition_setup_guide(self):
+        """نمایش راهنمای تنظیم SpeechRecognition"""
+        from PySide6.QtWidgets import QDialog, QVBoxLayout, QTextEdit, QPushButton, QHBoxLayout
+        from PySide6.QtCore import Qt
+        
+        dialog = QDialog(self)
+        dialog.setWindowTitle("راهنمای تنظیم SpeechRecognition")
+        dialog.setModal(True)
+        dialog.resize(700, 600)
+        
+        layout = QVBoxLayout(dialog)
+        
+        # متن راهنما
+        text_edit = QTextEdit()
+        text_edit.setReadOnly(True)
+        text_edit.setHtml("""
+        <h2>راهنمای تنظیم SpeechRecognition</h2>
+        
+        <h3>🔧 تنظیم API Keys:</h3>
+        
+        <h4>1️⃣ Google Speech (رایگان - پیشنهادی):</h4>
+        <p>• نیازی به API Key ندارد</p>
+        <p>• 60 دقیقه در ماه رایگان</p>
+        <p>• بهترین کیفیت برای فارسی</p>
+        
+        <h4>2️⃣ Wit.ai:</h4>
+        <p>• به <a href="https://wit.ai">Wit.ai</a> بروید</p>
+        <p>• حساب کاربری بسازید</p>
+        <p>• API Key دریافت کنید</p>
+        <p>• متغیر محیطی تنظیم کنید:</p>
+        <p><code>set WIT_AI_KEY=your_key_here</code></p>
+        
+        <h4>3️⃣ Azure Speech:</h4>
+        <p>• به <a href="https://portal.azure.com">Azure Portal</a> بروید</p>
+        <p>• Cognitive Services > Speech ایجاد کنید</p>
+        <p>• API Key و Region دریافت کنید</p>
+        <p>• متغیرهای محیطی تنظیم کنید:</p>
+        <p><code>set AZURE_SPEECH_KEY=your_key_here</code></p>
+        <p><code>set AZURE_SPEECH_REGION=your_region_here</code></p>
+        
+        <h4>4️⃣ Bing Speech:</h4>
+        <p>• به <a href="https://azure.microsoft.com">Azure</a> بروید</p>
+        <p>• Bing Speech API فعال کنید</p>
+        <p>• API Key دریافت کنید</p>
+        <p>• متغیر محیطی تنظیم کنید:</p>
+        <p><code>set BING_KEY=your_key_here</code></p>
+        
+        <h4>5️⃣ Houndify:</h4>
+        <p>• به <a href="https://www.houndify.com">Houndify</a> بروید</p>
+        <p>• حساب کاربری بسازید</p>
+        <p>• Client ID و Client Key دریافت کنید</p>
+        <p>• متغیرهای محیطی تنظیم کنید:</p>
+        <p><code>set HOUNDIFY_CLIENT_ID=your_client_id</code></p>
+        <p><code>set HOUNDIFY_CLIENT_KEY=your_client_key</code></p>
+        
+        <h4>6️⃣ IBM Speech:</h4>
+        <p>• به <a href="https://www.ibm.com/cloud/watson-speech-to-text">IBM Watson</a> بروید</p>
+        <p>• حساب کاربری بسازید</p>
+        <p>• Username و Password دریافت کنید</p>
+        <p>• متغیرهای محیطی تنظیم کنید:</p>
+        <p><code>set IBM_USERNAME=your_username</code></p>
+        <p><code>set IBM_PASSWORD=your_password</code></p>
+        
+        <h3>💡 نکات مهم:</h3>
+        <p>• Google Speech بهترین گزینه برای فارسی است</p>
+        <p>• CMU Sphinx کاملاً آفلاین است (فقط انگلیسی)</p>
+        <p>• سایر سرویس‌ها نیاز به API Key دارند</p>
+        <p>• متغیرهای محیطی را در Command Prompt تنظیم کنید</p>
+        
+        <h3>🔗 لینک‌های مفید:</h3>
+        <p>• <a href="https://wit.ai">Wit.ai</a></p>
+        <p>• <a href="https://portal.azure.com">Azure Portal</a></p>
+        <p>• <a href="https://www.houndify.com">Houndify</a></p>
+        <p>• <a href="https://www.ibm.com/cloud/watson-speech-to-text">IBM Watson</a></p>
+        """)
+        
+        layout.addWidget(text_edit)
+        
+        # دکمه‌ها
+        button_layout = QHBoxLayout()
+        
+        open_wit_btn = QPushButton("Wit.ai")
+        open_wit_btn.setStyleSheet("background-color: #4CAF50; color: white; padding: 8px;")
+        open_wit_btn.clicked.connect(lambda: webbrowser.open("https://wit.ai"))
+        
+        open_azure_btn = QPushButton("Azure Portal")
+        open_azure_btn.setStyleSheet("background-color: #2196F3; color: white; padding: 8px;")
+        open_azure_btn.clicked.connect(lambda: webbrowser.open("https://portal.azure.com"))
+        
+        open_houndify_btn = QPushButton("Houndify")
+        open_houndify_btn.setStyleSheet("background-color: #FF9800; color: white; padding: 8px;")
+        open_houndify_btn.clicked.connect(lambda: webbrowser.open("https://www.houndify.com"))
+        
+        open_ibm_btn = QPushButton("IBM Watson")
+        open_ibm_btn.setStyleSheet("background-color: #9C27B0; color: white; padding: 8px;")
+        open_ibm_btn.clicked.connect(lambda: webbrowser.open("https://www.ibm.com/cloud/watson-speech-to-text"))
+        
+        close_btn = QPushButton("بستن")
+        close_btn.clicked.connect(dialog.accept)
+        
+        button_layout.addWidget(open_wit_btn)
+        button_layout.addWidget(open_azure_btn)
+        button_layout.addWidget(open_houndify_btn)
+        button_layout.addWidget(open_ibm_btn)
         button_layout.addWidget(close_btn)
         
         layout.addLayout(button_layout)
