@@ -673,6 +673,32 @@ class ModelSelectionDialog(QDialog):
         """)
         self.checkbox_english.stateChanged.connect(self.filter_models)
         
+        self.checkbox_multilingual = QCheckBox("چند زبانه")
+        self.checkbox_multilingual.setChecked(True)
+        self.checkbox_multilingual.setStyleSheet("""
+            QCheckBox {
+                font-weight: bold; 
+                color: #ffd54f;
+                font-size: 14px;
+                padding: 5px;
+            }
+            QCheckBox::indicator {
+                width: 18px;
+                height: 18px;
+                border: 2px solid #ffd54f;
+                border-radius: 3px;
+                background-color: #2b2b2b;
+            }
+            QCheckBox::indicator:checked {
+                background-color: #ffd54f;
+                border: 2px solid #ffc107;
+            }
+            QCheckBox::indicator:hover {
+                border: 2px solid #fff176;
+            }
+        """)
+        self.checkbox_multilingual.stateChanged.connect(self.filter_models)
+        
         # چک باکس نوع اتصال
         self.checkbox_online = QCheckBox("آنلاین")
         self.checkbox_online.setChecked(True)
@@ -732,6 +758,7 @@ class ModelSelectionDialog(QDialog):
         filter_layout.addWidget(lang_label)
         filter_layout.addWidget(self.checkbox_persian)
         filter_layout.addWidget(self.checkbox_english)
+        filter_layout.addWidget(self.checkbox_multilingual)
         filter_layout.addStretch()
         
         # برچسب نوع
@@ -895,7 +922,7 @@ class ModelSelectionDialog(QDialog):
         for model_id, description, language, connection_type in self.all_models:
             # بررسی فیلتر زبان
             language_match = False
-            if language == "both":
+            if language == "both" and self.checkbox_multilingual.isChecked():
                 language_match = True
             elif language == "persian" and self.checkbox_persian.isChecked():
                 language_match = True
