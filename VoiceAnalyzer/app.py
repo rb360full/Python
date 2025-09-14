@@ -257,7 +257,7 @@ class ModelDownloader:
         "whisper_large": {
             "url": "whisper://large",
             "name": "whisper-large",
-            "size": "2.9 GB",
+            "size": "3.1 GB",
             "language": "چند زبانه",
             "warning": "✅ بالاترین دقت",
             "type": "Whisper"
@@ -265,7 +265,7 @@ class ModelDownloader:
         "whisper_large_v2": {
             "url": "whisper://large-v2",
             "name": "whisper-large-v2",
-            "size": "2.9 GB",
+            "size": "3.1 GB",
             "language": "چند زبانه",
             "warning": "✅ جدیدترین نسخه",
             "type": "Whisper"
@@ -273,7 +273,7 @@ class ModelDownloader:
         "whisper_large_v3": {
             "url": "whisper://large-v3",
             "name": "whisper-large-v3",
-            "size": "2.9 GB",
+            "size": "3.1 GB",
             "language": "چند زبانه",
             "warning": "✅ جدیدترین نسخه",
             "type": "Whisper"
@@ -307,7 +307,7 @@ class ModelDownloader:
         "hf_whisper_large_v3_persian": {
             "url": "huggingface://nezamisafa/whisper-large-v3-persian",
             "name": "Whisper-Large-V3-Persian",
-            "size": "2.9 GB",
+            "size": "3.1 GB",
             "language": "فارسی",
             "warning": "✅ مخصوص فارسی - بهترین کیفیت",
             "type": "HuggingFace"
@@ -315,7 +315,7 @@ class ModelDownloader:
         "hf_whisper_large_v3_persian_alt": {
             "url": "huggingface://MohammadKhosravi/whisper-large-v3-Persian",
             "name": "Whisper-Large-V3-Persian-Alt",
-            "size": "2.9 GB",
+            "size": "3.1 GB",
             "language": "فارسی",
             "warning": "✅ مخصوص فارسی - جایگزین",
             "type": "HuggingFace"
@@ -323,7 +323,7 @@ class ModelDownloader:
         "hf_whisper_large_persian_steja": {
             "url": "huggingface://steja/whisper-large-persian",
             "name": "Whisper-Large-Persian-Steja",
-            "size": "2.9 GB",
+            "size": "3.1 GB",
             "language": "فارسی",
             "warning": "✅ مخصوص فارسی - Steja (WER: 26.37%)",
             "type": "HuggingFace"
@@ -371,7 +371,7 @@ class ModelDownloader:
         "hf_whisper_large": {
             "url": "huggingface://openai/whisper-large-v2",
             "name": "Whisper-Large-V2-HF",
-            "size": "2.9 GB",
+            "size": "3.1 GB",
             "language": "چند زبانه",
             "warning": "✅ بالاترین دقت",
             "type": "HuggingFace"
@@ -379,7 +379,7 @@ class ModelDownloader:
         "hf_whisper_large_v2": {
             "url": "huggingface://openai/whisper-large-v2",
             "name": "Whisper-Large-V2-HF",
-            "size": "2.9 GB",
+            "size": "3.1 GB",
             "language": "چند زبانه",
             "warning": "✅ جدیدترین نسخه",
             "type": "HuggingFace"
@@ -387,7 +387,7 @@ class ModelDownloader:
         "hf_whisper_large_v3": {
             "url": "huggingface://openai/whisper-large-v3",
             "name": "Whisper-Large-V3-HF",
-            "size": "2.9 GB",
+            "size": "3.1 GB",
             "language": "چند زبانه",
             "warning": "✅ جدیدترین نسخه",
             "type": "HuggingFace"
@@ -827,25 +827,25 @@ class ModelSelectionDialog(QDialog):
             ("whisper_base", "⚠️ Whisper Base - ضعیف برای فارسی (142 MB)", "both", "offline"),
             ("whisper_small", "✅ Whisper Small - تعادل خوب (466 MB)", "both", "offline"),
             ("whisper_medium", "✅ Whisper Medium - دقت بالا (1.5 GB)", "both", "offline"),
-            ("whisper_large", "✅ Whisper Large - بالاترین دقت (2.9 GB)", "both", "offline"),
-            ("whisper_large_v2", "✅ Whisper Large V2 - جدیدترین نسخه (2.9 GB)", "both", "offline"),
-            ("whisper_large_v3", "✅ Whisper Large V3 - جدیدترین نسخه (2.9 GB)", "both", "offline"),
+            ("whisper_large", "✅ Whisper Large - بالاترین دقت (3.1 GB)", "both", "offline"),
+            ("whisper_large_v2", "✅ Whisper Large V2 - جدیدترین نسخه (3.1 GB)", "both", "offline"),
+            ("whisper_large_v3", "✅ Whisper Large V3 - جدیدترین نسخه (3.1 GB)", "both", "offline"),
             
             # Hugging Face Transformers (آفلاین)
             ("hf_wav2vec2_persian", "✅ Wav2Vec2 Persian - مخصوص فارسی (1.2 GB)", "persian", "offline"),
             ("hf_wav2vec2_persian_v3", "🏆 Wav2Vec2 Persian V3 - بهترین کیفیت فارسی (1.2 GB)", "persian", "offline"),
             ("hf_wav2vec2_persian_jonatas", "⭐ Wav2Vec2 Persian Jonatas - مدل بهینه شده (1.2 GB)", "persian", "offline"),
-            ("hf_whisper_large_v3_persian", "✅ Whisper Large V3 Persian - بهترین کیفیت (2.9 GB)", "persian", "offline"),
-            ("hf_whisper_large_v3_persian_alt", "✅ Whisper Large V3 Persian Alt - جایگزین (2.9 GB)", "persian", "offline"),
-            ("hf_whisper_large_persian_steja", "✅ Whisper Large Persian Steja - مخصوص فارسی (2.9 GB)", "persian", "offline"),
+            ("hf_whisper_large_v3_persian", "✅ Whisper Large V3 Persian - بهترین کیفیت (3.1 GB)", "persian", "offline"),
+            ("hf_whisper_large_v3_persian_alt", "✅ Whisper Large V3 Persian Alt - جایگزین (3.1 GB)", "persian", "offline"),
+            ("hf_whisper_large_persian_steja", "✅ Whisper Large Persian Steja - مخصوص فارسی (3.1 GB)", "persian", "offline"),
             ("hf_wav2vec2_persian_alt", "⚠️ Wav2Vec2 Multilingual - چند زبانه (1.2 GB)", "both", "offline"),
             ("hf_whisper_tiny", "⚠️ Whisper Tiny HF - ضعیف برای فارسی (75 MB)", "both", "offline"),
             ("hf_whisper_base", "⚠️ Whisper Base HF - ضعیف برای فارسی (142 MB)", "both", "offline"),
             ("hf_whisper_small", "✅ Whisper Small HF - تعادل خوب (466 MB)", "both", "offline"),
             ("hf_whisper_medium", "✅ Whisper Medium HF - دقت بالا (1.5 GB)", "both", "offline"),
-            ("hf_whisper_large", "✅ Whisper Large HF - بالاترین دقت (2.9 GB)", "both", "offline"),
-            ("hf_whisper_large_v2", "✅ Whisper Large V2 HF - جدیدترین نسخه (2.9 GB)", "both", "offline"),
-            ("hf_whisper_large_v3", "✅ Whisper Large V3 HF - جدیدترین نسخه (2.9 GB)", "both", "offline"),
+            ("hf_whisper_large", "✅ Whisper Large HF - بالاترین دقت (3.1 GB)", "both", "offline"),
+            ("hf_whisper_large_v2", "✅ Whisper Large V2 HF - جدیدترین نسخه (3.1 GB)", "both", "offline"),
+            ("hf_whisper_large_v3", "✅ Whisper Large V3 HF - جدیدترین نسخه (3.1 GB)", "both", "offline"),
             
             # SpeechRecognition (آنلاین)
             ("speechrecognition_google", "🌐 Google Speech - رایگان 60دقیقه/ماه (آنلاین)", "both", "online"),
