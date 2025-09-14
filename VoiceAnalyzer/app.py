@@ -623,15 +623,35 @@ class ModelDownloader:
                     if os.path.exists(cache_dir):
                         for item in os.listdir(cache_dir):
                             if model_name.replace("/", "--") in item:
-                                return True
+                                # بررسی وجود فایل‌های ضروری
+                                model_cache_dir = os.path.join(cache_dir, item)
+                                if os.path.exists(model_cache_dir):
+                                    # بررسی snapshots
+                                    snapshots_dir = os.path.join(model_cache_dir, "snapshots")
+                                    if os.path.exists(snapshots_dir):
+                                        for snapshot in os.listdir(snapshots_dir):
+                                            snapshot_path = os.path.join(snapshots_dir, snapshot)
+                                            if os.path.isdir(snapshot_path):
+                                                # بررسی وجود فایل‌های ضروری
+                                                required_files = ["config.json", "tokenizer.json", "tokenizer_config.json"]
+                                                has_required = all(os.path.exists(os.path.join(snapshot_path, f)) for f in required_files)
+                                                
+                                                # بررسی وجود فایل مدل (pytorch_model.bin یا model.safetensors)
+                                                model_files = ["pytorch_model.bin", "model.safetensors"]
+                                                has_model = any(os.path.exists(os.path.join(snapshot_path, f)) for f in model_files)
+                                                
+                                                if has_required and has_model:
+                                                    # تست بارگذاری برای اطمینان از سلامت فایل
+                                                    try:
+                                                        AutoTokenizer.from_pretrained(snapshot_path, local_files_only=True)
+                                                        return True
+                                                    except:
+                                                        # فایل خراب است، حذف کن
+                                                        import shutil
+                                                        shutil.rmtree(snapshot_path)
+                                                        return False
                     
-                    # بررسی cache transformers
-                    try:
-                        # تلاش برای بارگذاری بدون دانلود
-                        AutoTokenizer.from_pretrained(model_name, local_files_only=True)
-                        return True
-                    except:
-                        return False
+                    return False
                 
                 return False
             except:
@@ -866,6 +886,7 @@ class ModelDownloadThread(QThread):
         try:
             from transformers import AutoModel, AutoTokenizer
             import os
+            import shutil
             
             # استخراج نام مدل از URL
             model_url = self.model_info["url"]
@@ -874,18 +895,23 @@ class ModelDownloadThread(QThread):
             
             model_name = model_url.replace("huggingface://", "")
             
+            # پاک کردن cache خراب قبل از دانلود
+            self.status.emit("بررسی و پاک کردن cache خراب...")
+            self.progress.emit(10)
+            self._clean_corrupted_cache(model_name)
+            
             self.status.emit(f"در حال دانلود مدل Hugging Face {model_name}...")
             self.progress.emit(20)
             
             # دانلود tokenizer
             self.status.emit("در حال دانلود tokenizer...")
             self.progress.emit(40)
-            tokenizer = AutoTokenizer.from_pretrained(model_name)
+            tokenizer = AutoTokenizer.from_pretrained(model_name, force_download=True)
             
             # دانلود مدل
             self.status.emit("در حال دانلود مدل...")
             self.progress.emit(70)
-            model = AutoModel.from_pretrained(model_name)
+            model = AutoModel.from_pretrained(model_name, force_download=True)
             
             self.progress.emit(100)
             self.status.emit("دانلود کامل شد!")
@@ -894,6 +920,29 @@ class ModelDownloadThread(QThread):
             
         except Exception as e:
             return False, f"خطا در دانلود Hugging Face: {str(e)}"
+    
+    def _clean_corrupted_cache(self, model_name):
+        """پاک کردن cache خراب مدل"""
+        try:
+            import os
+            import shutil
+            
+            cache_dir = os.path.expanduser("~/.cache/huggingface/hub")
+            if not os.path.exists(cache_dir):
+                return
+            
+            # پیدا کردن فولدر مدل
+            model_cache_name = model_name.replace("/", "--")
+            for item in os.listdir(cache_dir):
+                if model_cache_name in item:
+                    model_cache_dir = os.path.join(cache_dir, item)
+                    if os.path.exists(model_cache_dir):
+                        # پاک کردن فولدر مدل
+                        shutil.rmtree(model_cache_dir)
+                        break
+        except Exception as e:
+            # اگر پاک کردن cache مشکل داشت، ادامه بده
+            pass
 
 class DownloadedModelsManager(QDialog):
     """مدیریت مدل‌های دانلود شده"""
@@ -980,6 +1029,18 @@ class DownloadedModelsManager(QDialog):
         self.clear_button.setObjectName("clear_button")
         self.clear_button.clicked.connect(self.clear_all_models)
         button_layout.addWidget(self.clear_button)
+        
+        self.clean_cache_button = QPushButton("🧹 پاک کردن cache خراب")
+        self.clean_cache_button.setStyleSheet("""
+            QPushButton {
+                background-color: #FF9800;
+            }
+            QPushButton:hover {
+                background-color: #F57C00;
+            }
+        """)
+        self.clean_cache_button.clicked.connect(self.clean_corrupted_cache)
+        button_layout.addWidget(self.clean_cache_button)
         
         layout.addLayout(button_layout)
         
@@ -1142,6 +1203,47 @@ class DownloadedModelsManager(QDialog):
                 
             except Exception as e:
                 QMessageBox.critical(self, "خطا", f"خطا در پاک کردن مدل‌ها:\n{str(e)}")
+    
+    def clean_corrupted_cache(self):
+        """پاک کردن cache خراب مدل‌های Hugging Face"""
+        try:
+            import os
+            import shutil
+            from transformers import AutoTokenizer
+            
+            cache_dir = os.path.expanduser("~/.cache/huggingface/hub")
+            if not os.path.exists(cache_dir):
+                QMessageBox.information(self, "اطلاعات", "فولدر cache Hugging Face وجود ندارد.")
+                return
+            
+            cleaned_count = 0
+            
+            # بررسی همه مدل‌های cache شده
+            for item in os.listdir(cache_dir):
+                model_cache_dir = os.path.join(cache_dir, item)
+                if os.path.isdir(model_cache_dir):
+                    # بررسی snapshots
+                    snapshots_dir = os.path.join(model_cache_dir, "snapshots")
+                    if os.path.exists(snapshots_dir):
+                        for snapshot in os.listdir(snapshots_dir):
+                            snapshot_path = os.path.join(snapshots_dir, snapshot)
+                            if os.path.isdir(snapshot_path):
+                                # تست بارگذاری
+                                try:
+                                    AutoTokenizer.from_pretrained(snapshot_path, local_files_only=True)
+                                except:
+                                    # فایل خراب است، حذف کن
+                                    shutil.rmtree(snapshot_path)
+                                    cleaned_count += 1
+            
+            if cleaned_count > 0:
+                QMessageBox.information(self, "موفق", f"{cleaned_count} فولدر cache خراب پاک شد.")
+                self.refresh_models()
+            else:
+                QMessageBox.information(self, "اطلاعات", "هیچ cache خرابی پیدا نشد.")
+                
+        except Exception as e:
+            QMessageBox.critical(self, "خطا", f"خطا در پاک کردن cache:\n{str(e)}")
 
 class ModelSelectionDialog(QDialog):
     def __init__(self, parent=None):
