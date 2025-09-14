@@ -1,9 +1,9 @@
 {
-  "selected_model": "hf_wav2vec2_persian_jonatas",
+  "selected_model": "hf_whisper_large_v3_persian",
   "last_audio_path": "C:/Users/Reza/Desktop/_ALI/02.ogg",
   "window_geometry": {
     "x": 384,
-    "y": -30,
+    "y": -92,
     "width": 1004,
     "height": 826
   },

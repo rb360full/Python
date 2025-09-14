@@ -282,7 +282,7 @@ class ModelDownloader:
         # Hugging Face Transformers
         "hf_wav2vec2_persian": {
             "url": "huggingface://m3hrdadfi/wav2vec2-large-xlsr-persian",
-            "name": "wav2vec2-large-xlsr-persian",
+            "name": "Wav2Vec2-Large-XLSR-53-Persian",
             "size": "1.2 GB",
             "language": "فارسی",
             "warning": "✅ مخصوص فارسی - Hugging Face",
@@ -290,7 +290,7 @@ class ModelDownloader:
         },
         "hf_wav2vec2_persian_v3": {
             "url": "huggingface://m3hrdadfi/wav2vec2-large-xlsr-persian-v3",
-            "name": "wav2vec2-large-xlsr-persian-v3",
+            "name": "Wav2Vec2-Large-XLSR-53-Persian-V3",
             "size": "1.2 GB",
             "language": "فارسی",
             "warning": "✅ جدیدترین نسخه - بهترین کیفیت فارسی (WER: 10.36%)",
@@ -298,7 +298,7 @@ class ModelDownloader:
         },
         "hf_wav2vec2_persian_jonatas": {
             "url": "huggingface://jonatasgrosman/wav2vec2-large-xlsr-53-persian",
-            "name": "wav2vec2-large-xlsr-53-persian",
+            "name": "Wav2Vec2-Large-XLSR-53-Persian-Jonatas",
             "size": "1.2 GB",
             "language": "فارسی",
             "warning": "✅ مدل بهینه شده - کیفیت بالا (WER: 30.12%)",
@@ -306,7 +306,7 @@ class ModelDownloader:
         },
         "hf_whisper_large_v3_persian": {
             "url": "huggingface://nezamisafa/whisper-large-v3-persian",
-            "name": "whisper-large-v3-persian",
+            "name": "Whisper-Large-V3-Persian",
             "size": "2.9 GB",
             "language": "فارسی",
             "warning": "✅ مخصوص فارسی - بهترین کیفیت",
@@ -314,15 +314,23 @@ class ModelDownloader:
         },
         "hf_whisper_large_v3_persian_alt": {
             "url": "huggingface://MohammadKhosravi/whisper-large-v3-Persian",
-            "name": "whisper-large-v3-Persian",
+            "name": "Whisper-Large-V3-Persian-Alt",
             "size": "2.9 GB",
             "language": "فارسی",
             "warning": "✅ مخصوص فارسی - جایگزین",
             "type": "HuggingFace"
         },
+        "hf_whisper_large_persian_steja": {
+            "url": "huggingface://steja/whisper-large-persian",
+            "name": "Whisper-Large-Persian-Steja",
+            "size": "2.9 GB",
+            "language": "فارسی",
+            "warning": "✅ مخصوص فارسی - Steja (WER: 26.37%)",
+            "type": "HuggingFace"
+        },
         "hf_wav2vec2_persian_alt": {
             "url": "huggingface://facebook/wav2vec2-large-xlsr-53",
-            "name": "wav2vec2-large-xlsr-53",
+            "name": "Wav2Vec2-Large-XLSR-53-Multilingual",
             "size": "1.2 GB",
             "language": "چند زبانه",
             "warning": "⚠️ چند زبانه - نیاز به fine-tuning برای فارسی",
@@ -330,7 +338,7 @@ class ModelDownloader:
         },
         "hf_whisper_tiny": {
             "url": "huggingface://openai/whisper-tiny",
-            "name": "whisper-tiny-hf",
+            "name": "Whisper-Tiny-HF",
             "size": "75 MB",
             "language": "چند زبانه",
             "warning": "⚠️ ضعیف برای فارسی",
@@ -338,7 +346,7 @@ class ModelDownloader:
         },
         "hf_whisper_base": {
             "url": "huggingface://openai/whisper-base",
-            "name": "whisper-base-hf",
+            "name": "Whisper-Base-HF",
             "size": "142 MB",
             "language": "چند زبانه",
             "warning": "⚠️ ضعیف برای فارسی",
@@ -346,7 +354,7 @@ class ModelDownloader:
         },
         "hf_whisper_small": {
             "url": "huggingface://openai/whisper-small",
-            "name": "whisper-small-hf",
+            "name": "Whisper-Small-HF",
             "size": "466 MB",
             "language": "چند زبانه",
             "warning": "✅ تعادل خوب",
@@ -354,7 +362,7 @@ class ModelDownloader:
         },
         "hf_whisper_medium": {
             "url": "huggingface://openai/whisper-medium",
-            "name": "whisper-medium-hf",
+            "name": "Whisper-Medium-HF",
             "size": "1.5 GB",
             "language": "چند زبانه",
             "warning": "✅ دقت بالا",
@@ -362,7 +370,7 @@ class ModelDownloader:
         },
         "hf_whisper_large": {
             "url": "huggingface://openai/whisper-large-v2",
-            "name": "whisper-large-v2-hf",
+            "name": "Whisper-Large-V2-HF",
             "size": "2.9 GB",
             "language": "چند زبانه",
             "warning": "✅ بالاترین دقت",
@@ -370,7 +378,7 @@ class ModelDownloader:
         },
         "hf_whisper_large_v2": {
             "url": "huggingface://openai/whisper-large-v2",
-            "name": "whisper-large-v2-hf",
+            "name": "Whisper-Large-V2-HF",
             "size": "2.9 GB",
             "language": "چند زبانه",
             "warning": "✅ جدیدترین نسخه",
@@ -378,7 +386,7 @@ class ModelDownloader:
         },
         "hf_whisper_large_v3": {
             "url": "huggingface://openai/whisper-large-v3",
-            "name": "whisper-large-v3-hf",
+            "name": "Whisper-Large-V3-HF",
             "size": "2.9 GB",
             "language": "چند زبانه",
             "warning": "✅ جدیدترین نسخه",
@@ -829,6 +837,7 @@ class ModelSelectionDialog(QDialog):
             ("hf_wav2vec2_persian_jonatas", "⭐ Wav2Vec2 Persian Jonatas - مدل بهینه شده (1.2 GB)", "persian", "offline"),
             ("hf_whisper_large_v3_persian", "✅ Whisper Large V3 Persian - بهترین کیفیت (2.9 GB)", "persian", "offline"),
             ("hf_whisper_large_v3_persian_alt", "✅ Whisper Large V3 Persian Alt - جایگزین (2.9 GB)", "persian", "offline"),
+            ("hf_whisper_large_persian_steja", "✅ Whisper Large Persian Steja - مخصوص فارسی (2.9 GB)", "persian", "offline"),
             ("hf_wav2vec2_persian_alt", "⚠️ Wav2Vec2 Multilingual - چند زبانه (1.2 GB)", "both", "offline"),
             ("hf_whisper_tiny", "⚠️ Whisper Tiny HF - ضعیف برای فارسی (75 MB)", "both", "offline"),
             ("hf_whisper_base", "⚠️ Whisper Base HF - ضعیف برای فارسی (142 MB)", "both", "offline"),
@@ -1561,9 +1570,10 @@ class TranscribeThread(QThread):
             elif self.model_name == "hf_whisper_large_v3_persian":
                 # تلاش برای بارگذاری مدل Whisper فارسی
                 try:
+                    from transformers import WhisperForConditionalGeneration, WhisperProcessor
                     model_name = "nezamisafa/whisper-large-v3-persian"
-                    processor = AutoProcessor.from_pretrained(model_name)
-                    model = AutoModelForCTC.from_pretrained(model_name)
+                    processor = WhisperProcessor.from_pretrained(model_name)
+                    model = WhisperForConditionalGeneration.from_pretrained(model_name)
                 except Exception as e:
                     error_msg = str(e)
                     if "not a valid model identifier" in error_msg:
@@ -1589,9 +1599,10 @@ class TranscribeThread(QThread):
             elif self.model_name == "hf_whisper_large_v3_persian_alt":
                 # تلاش برای بارگذاری مدل Whisper فارسی جایگزین
                 try:
+                    from transformers import WhisperForConditionalGeneration, WhisperProcessor
                     model_name = "MohammadKhosravi/whisper-large-v3-Persian"
-                    processor = AutoProcessor.from_pretrained(model_name)
-                    model = AutoModelForCTC.from_pretrained(model_name)
+                    processor = WhisperProcessor.from_pretrained(model_name)
+                    model = WhisperForConditionalGeneration.from_pretrained(model_name)
                 except Exception as e:
                     error_msg = str(e)
                     if "not a valid model identifier" in error_msg:
@@ -1613,6 +1624,36 @@ class TranscribeThread(QThread):
 """
                     else:
                         return f"Hugging Face Error: {error_msg}. لطفاً از Whisper عادی استفاده کنید."
+                        
+            elif self.model_name == "hf_whisper_large_persian_steja":
+                # تلاش برای بارگذاری مدل Whisper فارسی Steja
+                try:
+                    from transformers import WhisperForConditionalGeneration, WhisperProcessor
+                    model_name = "steja/whisper-large-persian"
+                    processor = WhisperProcessor.from_pretrained(model_name)
+                    model = WhisperForConditionalGeneration.from_pretrained(model_name)
+                except Exception as e:
+                    error_msg = str(e)
+                    if "not a valid model identifier" in error_msg:
+                        return f"""Hugging Face Error: مدل Whisper فارسی Steja در دسترس نیست
+
+مشکل: مدل steja/whisper-large-persian یافت نشد
+
+راه‌حل‌ها:
+1. اتصال اینترنت خود را بررسی کنید
+2. از مدل‌های جایگزین استفاده کنید:
+   • Wav2Vec2 Persian V3 (بهترین کیفیت)
+   • Wav2Vec2 Persian (نسخه قبلی)
+   • Vosk Persian (بهترین برای فارسی)
+
+برای استفاده از Hugging Face:
+1. به https://huggingface.co بروید
+2. حساب کاربری بسازید
+3. از دستور زیر استفاده کنید:
+   hf auth login
+"""
+                    else:
+                        return f"Hugging Face Error: {error_msg}. لطفاً از Whisper عادی استفاده کنید."
                     
             elif self.model_name == "hf_wav2vec2_persian_alt":
                 # استفاده از مدل عمومی wav2vec2
@@ -1624,6 +1665,7 @@ class TranscribeThread(QThread):
                     return f"Hugging Face Error: مدل wav2vec2 در دسترس نیست ({str(e)}). لطفاً از مدل‌های دیگر استفاده کنید."
             else:
                 # مدل‌های عمومی Whisper
+                from transformers import WhisperForConditionalGeneration, WhisperProcessor
                 model_name = self.model_name.replace("hf_", "").replace("_hf", "")
                 if model_name == "whisper_large":
                     model_name = "openai/whisper-large-v2"
@@ -1635,8 +1677,8 @@ class TranscribeThread(QThread):
                     model_name = f"openai/whisper-{model_name}"
                 
                 try:
-                    processor = AutoProcessor.from_pretrained(model_name)
-                    model = AutoModelForCTC.from_pretrained(model_name)
+                    processor = WhisperProcessor.from_pretrained(model_name)
+                    model = WhisperForConditionalGeneration.from_pretrained(model_name)
                 except Exception as e:
                     return f"Hugging Face Error: مدل {model_name} در دسترس نیست ({str(e)}). لطفاً از مدل‌های دیگر استفاده کنید."
             
