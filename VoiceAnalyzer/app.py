@@ -4,9 +4,11 @@ from pathlib import Path
 from PySide6.QtWidgets import (
     QApplication, QWidget, QPushButton, QVBoxLayout, QLabel, QFileDialog,
     QTextEdit, QScrollArea, QProgressBar, QMessageBox, QDialog, QComboBox,
-    QDialogButtonBox, QFormLayout
+    QDialogButtonBox, QFormLayout, QHBoxLayout, QTabWidget, QListWidget, 
+    QListWidgetItem, QCheckBox
 )
 from PySide6.QtCore import Qt, QThread, Signal
+from PySide6.QtGui import QColor
 import subprocess
 import json
 import collections
@@ -598,101 +600,202 @@ class ModelSelectionDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle("انتخاب مدل Speech-to-Text")
         self.setModal(True)
-        self.resize(500, 300)
+        self.resize(600, 500)
         
-        layout = QFormLayout(self)
+        layout = QVBoxLayout(self)
+        
+        # فیلترهای مدل
+        filter_layout = QHBoxLayout()
+        
+        # چک باکس زبان
+        self.checkbox_persian = QCheckBox("فارسی")
+        self.checkbox_persian.setChecked(True)
+        self.checkbox_persian.setStyleSheet("QCheckBox { font-weight: bold; color: #2e7d32; }")
+        self.checkbox_persian.stateChanged.connect(self.filter_models)
+        
+        self.checkbox_english = QCheckBox("انگلیسی")
+        self.checkbox_english.setChecked(True)
+        self.checkbox_english.setStyleSheet("QCheckBox { font-weight: bold; color: #1976d2; }")
+        self.checkbox_english.stateChanged.connect(self.filter_models)
+        
+        # چک باکس نوع اتصال
+        self.checkbox_online = QCheckBox("آنلاین")
+        self.checkbox_online.setChecked(True)
+        self.checkbox_online.setStyleSheet("QCheckBox { font-weight: bold; color: #ff6b35; }")
+        self.checkbox_online.stateChanged.connect(self.filter_models)
+        
+        self.checkbox_offline = QCheckBox("آفلاین")
+        self.checkbox_offline.setChecked(True)
+        self.checkbox_offline.setStyleSheet("QCheckBox { font-weight: bold; color: #9c27b0; }")
+        self.checkbox_offline.stateChanged.connect(self.filter_models)
+        
+        filter_layout.addWidget(QLabel("زبان:"))
+        filter_layout.addWidget(self.checkbox_persian)
+        filter_layout.addWidget(self.checkbox_english)
+        filter_layout.addStretch()
+        filter_layout.addWidget(QLabel("نوع:"))
+        filter_layout.addWidget(self.checkbox_online)
+        filter_layout.addWidget(self.checkbox_offline)
+        
+        layout.addLayout(filter_layout)
         
         # لیست مدل‌های Speech-to-Text (فقط فارسی و انگلیسی)
-        self.model_combo = QComboBox()
-        models = [
-            # Vosk Models (کاملاً رایگان)
-            ("vosk_persian", "✅ Vosk Persian - مخصوص فارسی (1.13 GB)"),
-            ("vosk_small", "⚠️ Vosk Small - فقط انگلیسی (40 MB)"),
-            ("vosk_large", "⚠️ Vosk Large - فقط انگلیسی (1.8 GB)"),
+        self.model_list = QListWidget()
+        self.model_list.setMinimumHeight(300)
+        self.model_list.setStyleSheet("""
+            QListWidget {
+                background-color: #f5f5f5;
+                border: 1px solid #ddd;
+                border-radius: 5px;
+                padding: 5px;
+            }
+            QListWidget::item {
+                padding: 8px;
+                border-bottom: 1px solid #eee;
+            }
+            QListWidget::item:selected {
+                background-color: #e3f2fd;
+                color: #1976d2;
+            }
+        """)
+        layout.addWidget(self.model_list)
+        
+        # ذخیره تمام مدل‌ها برای فیلتر کردن
+        self.all_models = [
+            # Vosk Models (آفلاین)
+            ("vosk_persian", "✅ Vosk Persian - مخصوص فارسی (1.13 GB)", "persian", "offline"),
+            ("vosk_small", "⚠️ Vosk Small - فقط انگلیسی (40 MB)", "english", "offline"),
+            ("vosk_large", "⚠️ Vosk Large - فقط انگلیسی (1.8 GB)", "english", "offline"),
             
-            # Whisper Models (چند زبانه)
-            ("whisper_tiny", "⚠️ Whisper Tiny - خیلی ضعیف برای فارسی (75 MB)"),
-            ("whisper_base", "⚠️ Whisper Base - ضعیف برای فارسی (142 MB)"),
-            ("whisper_small", "✅ Whisper Small - تعادل خوب (466 MB)"),
-            ("whisper_medium", "✅ Whisper Medium - دقت بالا (1.5 GB)"),
-            ("whisper_large", "✅ Whisper Large - بالاترین دقت (2.9 GB)"),
-            ("whisper_large_v2", "✅ Whisper Large V2 - جدیدترین نسخه (2.9 GB)"),
-            ("whisper_large_v3", "✅ Whisper Large V3 - جدیدترین نسخه (2.9 GB)"),
+            # Whisper Models (آفلاین - چند زبانه)
+            ("whisper_tiny", "⚠️ Whisper Tiny - خیلی ضعیف برای فارسی (75 MB)", "both", "offline"),
+            ("whisper_base", "⚠️ Whisper Base - ضعیف برای فارسی (142 MB)", "both", "offline"),
+            ("whisper_small", "✅ Whisper Small - تعادل خوب (466 MB)", "both", "offline"),
+            ("whisper_medium", "✅ Whisper Medium - دقت بالا (1.5 GB)", "both", "offline"),
+            ("whisper_large", "✅ Whisper Large - بالاترین دقت (2.9 GB)", "both", "offline"),
+            ("whisper_large_v2", "✅ Whisper Large V2 - جدیدترین نسخه (2.9 GB)", "both", "offline"),
+            ("whisper_large_v3", "✅ Whisper Large V3 - جدیدترین نسخه (2.9 GB)", "both", "offline"),
             
-            # Hugging Face Transformers
-            ("hf_wav2vec2_persian", "✅ Wav2Vec2 Persian - مخصوص فارسی (1.2 GB)"),
-            ("hf_whisper_persian", "✅ Whisper Persian - مخصوص فارسی (1.5 GB)"),
-            ("hf_wav2vec2_persian_alt", "⚠️ Wav2Vec2 Multilingual - چند زبانه (1.2 GB)"),
-            ("hf_whisper_tiny", "⚠️ Whisper Tiny HF - ضعیف برای فارسی (75 MB)"),
-            ("hf_whisper_base", "⚠️ Whisper Base HF - ضعیف برای فارسی (142 MB)"),
-            ("hf_whisper_small", "✅ Whisper Small HF - تعادل خوب (466 MB)"),
-            ("hf_whisper_medium", "✅ Whisper Medium HF - دقت بالا (1.5 GB)"),
-            ("hf_whisper_large", "✅ Whisper Large HF - بالاترین دقت (2.9 GB)"),
+            # Hugging Face Transformers (آفلاین)
+            ("hf_wav2vec2_persian", "✅ Wav2Vec2 Persian - مخصوص فارسی (1.2 GB)", "persian", "offline"),
+            ("hf_whisper_persian", "✅ Whisper Persian - مخصوص فارسی (1.5 GB)", "persian", "offline"),
+            ("hf_wav2vec2_persian_alt", "⚠️ Wav2Vec2 Multilingual - چند زبانه (1.2 GB)", "both", "offline"),
+            ("hf_whisper_tiny", "⚠️ Whisper Tiny HF - ضعیف برای فارسی (75 MB)", "both", "offline"),
+            ("hf_whisper_base", "⚠️ Whisper Base HF - ضعیف برای فارسی (142 MB)", "both", "offline"),
+            ("hf_whisper_small", "✅ Whisper Small HF - تعادل خوب (466 MB)", "both", "offline"),
+            ("hf_whisper_medium", "✅ Whisper Medium HF - دقت بالا (1.5 GB)", "both", "offline"),
+            ("hf_whisper_large", "✅ Whisper Large HF - بالاترین دقت (2.9 GB)", "both", "offline"),
             
-            # SpeechRecognition
-            ("speechrecognition_google", "🌐 Google Speech - رایگان 60دقیقه/ماه (آنلاین)"),
-            ("speechrecognition_sphinx", "⚠️ CMU Sphinx - فقط انگلیسی (100 MB)"),
-            ("speechrecognition_wit", "🌐 Wit.ai - رایگان تا حدی (آنلاین)"),
-            ("speechrecognition_azure", "🌐 Azure Speech - رایگان 5ساعت/ماه (آنلاین)"),
-            ("speechrecognition_bing", "🌐 Bing Speech - رایگان تا حدی (آنلاین)"),
-            ("speechrecognition_houndify", "🌐 Houndify - رایگان تا حدی (آنلاین)"),
-            ("speechrecognition_ibm", "🌐 IBM Speech - رایگان تا حدی (آنلاین)"),
+            # SpeechRecognition (آنلاین)
+            ("speechrecognition_google", "🌐 Google Speech - رایگان 60دقیقه/ماه (آنلاین)", "both", "online"),
+            ("speechrecognition_sphinx", "⚠️ CMU Sphinx - فقط انگلیسی (100 MB)", "english", "offline"),
+            ("speechrecognition_wit", "🌐 Wit.ai - رایگان تا حدی (آنلاین)", "both", "online"),
+            ("speechrecognition_azure", "🌐 Azure Speech - رایگان 5ساعت/ماه (آنلاین)", "both", "online"),
+            ("speechrecognition_bing", "🌐 Bing Speech - رایگان تا حدی (آنلاین)", "both", "online"),
+            ("speechrecognition_houndify", "🌐 Houndify - رایگان تا حدی (آنلاین)", "both", "online"),
+            ("speechrecognition_ibm", "🌐 IBM Speech - رایگان تا حدی (آنلاین)", "both", "online"),
             
-            # Silero STT
-            ("silero_stt_en", "⚠️ Silero STT English - فقط انگلیسی (50 MB)"),
-            ("silero_stt_multilingual", "✅ Silero STT Multilingual - پشتیبانی از فارسی (200 MB)"),
+            # Silero STT (آفلاین)
+            ("silero_stt_en", "⚠️ Silero STT English - فقط انگلیسی (50 MB)", "english", "offline"),
+            ("silero_stt_multilingual", "✅ Silero STT Multilingual - پشتیبانی از فارسی (200 MB)", "both", "offline"),
             
-            # Kaldi
-            ("kaldi_persian", "🚧 Kaldi Persian - در حال توسعه (500 MB)"),
-            ("kaldi_english", "🚧 Kaldi English - در حال توسعه (300 MB)"),
+            # Kaldi (آفلاین)
+            ("kaldi_persian", "🚧 Kaldi Persian - در حال توسعه (500 MB)", "persian", "offline"),
+            ("kaldi_english", "🚧 Kaldi English - در حال توسعه (300 MB)", "english", "offline"),
             
-            # سرویس‌های بومی ایرانی
-            ("iranian_arvan", "🇮🇷 Arvan Cloud Speech - سرویس ایرانی (آنلاین)"),
-            ("iranian_fanap", "🇮🇷 Fanap Speech API - سرویس ایرانی (آنلاین)"),
-            ("iranian_parsijoo", "🇮🇷 Parsijoo Speech - سرویس ایرانی (آنلاین)"),
+            # سرویس‌های بومی ایرانی (آنلاین)
+            ("iranian_arvan", "🇮🇷 Arvan Cloud Speech - سرویس ایرانی (آنلاین)", "persian", "online"),
+            ("iranian_fanap", "🇮🇷 Fanap Speech API - سرویس ایرانی (آنلاین)", "persian", "online"),
+            ("iranian_parsijoo", "🇮🇷 Parsijoo Speech - سرویس ایرانی (آنلاین)", "persian", "online"),
             
-            # Google Models (برای سازگاری)
-            ("google_standard", "🌐 Google Standard - رایگان 60دقیقه/ماه (آنلاین)"),
-            ("google_enhanced", "💳 Google Enhanced - پولی، دقت بالاتر (آنلاین)"),
-            ("google_phone_call", "💳 Google Phone Call - پولی، مخصوص تماس‌ها (آنلاین)"),
-            ("google_medical", "💳 Google Medical - پولی، اصطلاحات پزشکی (آنلاین)"),
-            ("google_video", "💳 Google Video - پولی، مخصوص ویدیوها (آنلاین)"),
+            # Google Models (آنلاین)
+            ("google_standard", "🌐 Google Standard - رایگان 60دقیقه/ماه (آنلاین)", "both", "online"),
+            ("google_enhanced", "💳 Google Enhanced - پولی، دقت بالاتر (آنلاین)", "both", "online"),
+            ("google_phone_call", "💳 Google Phone Call - پولی، مخصوص تماس‌ها (آنلاین)", "both", "online"),
+            ("google_medical", "💳 Google Medical - پولی، اصطلاحات پزشکی (آنلاین)", "both", "online"),
+            ("google_video", "💳 Google Video - پولی، مخصوص ویدیوها (آنلاین)", "both", "online"),
             
-            # Microsoft Azure Speech
-            ("azure_standard", "🌐 Azure Standard - رایگان 5ساعت/ماه (آنلاین)"),
-            ("azure_enhanced", "💳 Azure Enhanced - پولی، دقت بالاتر (آنلاین)"),
+            # Microsoft Azure Speech (آنلاین)
+            ("azure_standard", "🌐 Azure Standard - رایگان 5ساعت/ماه (آنلاین)", "both", "online"),
+            ("azure_enhanced", "💳 Azure Enhanced - پولی، دقت بالاتر (آنلاین)", "both", "online"),
             
-            # AssemblyAI
-            ("assemblyai_standard", "🌐 AssemblyAI - رایگان 3ساعت/ماه (آنلاین)"),
-            ("assemblyai_enhanced", "💳 AssemblyAI Enhanced - پولی، دقت بالاتر (آنلاین)")
+            # AssemblyAI (آنلاین)
+            ("assemblyai_standard", "🌐 AssemblyAI - رایگان 3ساعت/ماه (آنلاین)", "both", "online"),
+            ("assemblyai_enhanced", "💳 AssemblyAI Enhanced - پولی، دقت بالاتر (آنلاین)", "both", "online")
         ]
         
-        for model_id, description in models:
-            self.model_combo.addItem(f"{model_id} - {description}", model_id)
+        # بارگذاری مدل‌ها در لیست
+        self.populate_model_list()
         
         # بارگذاری آخرین مدل انتخاب شده
         config = ConfigManager.load_config()
         last_model = config.get("selected_model", "vosk_persian")
         
-        # پیدا کردن ایندکس مدل آخر
-        model_index = 0
-        for i, (model_id, _) in enumerate(models):
-            if model_id == last_model:
-                model_index = i
+        # پیدا کردن و انتخاب مدل آخر
+        for i in range(self.model_list.count()):
+            item = self.model_list.item(i)
+            if item.data(Qt.UserRole) == last_model:
+                self.model_list.setCurrentItem(item)
                 break
         
-        self.model_combo.setCurrentIndex(model_index)
-        
-        layout.addRow("مدل:", self.model_combo)
-        
         # دکمه‌ها
-        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
-        buttons.accepted.connect(self.accept)
-        buttons.rejected.connect(self.reject)
-        layout.addRow(buttons)
+        button_layout = QHBoxLayout()
+        self.ok_button = QPushButton("تأیید")
+        self.ok_button.setStyleSheet("background-color: #4CAF50; color: white; padding: 8px 16px;")
+        self.ok_button.clicked.connect(self.accept)
+        
+        self.cancel_button = QPushButton("لغو")
+        self.cancel_button.setStyleSheet("background-color: #f44336; color: white; padding: 8px 16px;")
+        self.cancel_button.clicked.connect(self.reject)
+        
+        button_layout.addWidget(self.ok_button)
+        button_layout.addWidget(self.cancel_button)
+        layout.addLayout(button_layout)
+    
+    def populate_model_list(self):
+        """بارگذاری مدل‌ها در لیست بر اساس فیلترها"""
+        self.model_list.clear()
+        
+        for model_id, description, language, connection_type in self.all_models:
+            # بررسی فیلتر زبان
+            language_match = False
+            if language == "both":
+                language_match = True
+            elif language == "persian" and self.checkbox_persian.isChecked():
+                language_match = True
+            elif language == "english" and self.checkbox_english.isChecked():
+                language_match = True
+            
+            # بررسی فیلتر نوع اتصال
+            connection_match = False
+            if connection_type == "online" and self.checkbox_online.isChecked():
+                connection_match = True
+            elif connection_type == "offline" and self.checkbox_offline.isChecked():
+                connection_match = True
+            
+            # اگر هر دو فیلتر مطابقت داشت، مدل را اضافه کن
+            if language_match and connection_match:
+                item = QListWidgetItem(f"{model_id} - {description}")
+                item.setData(Qt.UserRole, model_id)
+                
+                # رنگ‌بندی بر اساس نوع
+                if connection_type == "online":
+                    item.setBackground(QColor("#fff3e0"))  # نارنجی روشن
+                else:
+                    item.setBackground(QColor("#f3e5f5"))  # بنفش روشن
+                
+                self.model_list.addItem(item)
+    
+    def filter_models(self):
+        """فیلتر کردن مدل‌ها بر اساس چک باکس‌ها"""
+        self.populate_model_list()
     
     def get_selected_model(self):
-        return self.model_combo.currentData()
+        """دریافت مدل انتخاب شده"""
+        current_item = self.model_list.currentItem()
+        if current_item:
+            return current_item.data(Qt.UserRole)
+        return None
 
 def improve_persian_text(text):
     """بهبود متن فارسی با تصحیح خودکار"""
