@@ -1,9 +1,9 @@
 {
-  "selected_model": "hf_whisper_large_persian_steja",
+  "selected_model": "hf_whisper_large_v3_persian",
   "last_audio_path": "C:/Users/Reza/Desktop/_ALI/02.ogg",
   "window_geometry": {
     "x": 348,
-    "y": 33,
+    "y": 2,
     "width": 1004,
     "height": 723
   },

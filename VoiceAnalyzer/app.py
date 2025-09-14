@@ -193,6 +193,31 @@ class ConfigManager:
 class ModelDownloader:
     """کلاس دانلود خودکار مدل‌ها"""
     
+    @staticmethod
+    def _setup_ssl_context():
+        """تنظیم SSL context برای حل مشکلات اتصال"""
+        try:
+            import ssl
+            import urllib.request
+            import socket
+            
+            # ایجاد SSL context بدون اعتبارسنجی
+            ssl_context = ssl.create_default_context()
+            ssl_context.check_hostname = False
+            ssl_context.verify_mode = ssl.CERT_NONE
+            
+            # تنظیم opener برای urllib
+            opener = urllib.request.build_opener(urllib.request.HTTPSHandler(context=ssl_context))
+            urllib.request.install_opener(opener)
+            
+            # تنظیم timeout برای جلوگیری از hang
+            socket.setdefaulttimeout(60)
+            
+            return True
+        except Exception as e:
+            print(f"خطا در تنظیم SSL: {e}")
+            return False
+    
     # مدل‌های قابل دانلود
     DOWNLOADABLE_MODELS = {
         # Vosk Models (فقط فارسی و انگلیسی)
@@ -486,6 +511,12 @@ class ModelDownloader:
         
         model_info = ModelDownloader.DOWNLOADABLE_MODELS[model_id]
         
+        # بررسی اولیه - آیا مدل قبلاً دانلود شده؟
+        if ModelDownloader.is_model_downloaded(model_id):
+            if progress_callback:
+                progress_callback(f"مدل {model_info['name']} قبلاً دانلود شده است")
+            return True, f"مدل {model_info['name']} قبلاً دانلود شده است"
+        
         # برای مدل‌های Whisper
         if model_info["type"] == "Whisper":
             return ModelDownloader._download_whisper_model(model_id, model_info, progress_callback)
@@ -494,12 +525,21 @@ class ModelDownloader:
         elif model_info["type"] == "Vosk":
             return ModelDownloader._download_vosk_model(model_id, model_info, progress_callback)
         
+        # برای مدل‌های HuggingFace
+        elif model_info["type"] == "HuggingFace":
+            return ModelDownloader._download_huggingface_model(model_id, model_info, progress_callback)
+        
         return False, f"نوع مدل {model_info['type']} پشتیبانی نمی‌شود"
     
     @staticmethod
     def _download_whisper_model(model_id, model_info, progress_callback=None):
         """دانلود مدل Whisper با نمایش نوتیفیکیشن ساده"""
         try:
+            import whisper
+            import ssl
+            import urllib.request
+            import os
+            
             if progress_callback:
                 progress_callback(f"در حال دانلود {model_info['name']} ({model_info['size']})...")
             
@@ -511,19 +551,46 @@ class ModelDownloader:
             elif model_name == "large_v3":
                 model_name = "large-v3"
             
+            # تنظیم SSL برای حل مشکل SSL
+            if progress_callback:
+                progress_callback("تنظیم اتصال امن...")
+            
+            ModelDownloader._setup_ssl_context()
+            
             if progress_callback:
                 progress_callback(f"در حال بارگذاری مدل Whisper {model_name}...")
             
-            # دانلود مدل
-            model = whisper.load_model(model_name)
-            
-            if progress_callback:
-                progress_callback(f"مدل {model_name} با موفقیت دانلود شد")
-            
-            return True, f"مدل {model_name} با موفقیت دانلود شد"
+            # تلاش برای دانلود با retry
+            max_retries = 3
+            for attempt in range(max_retries):
+                try:
+                    if progress_callback:
+                        progress_callback(f"تلاش {attempt + 1} از {max_retries}...")
+                    
+                    # دانلود مدل
+                    model = whisper.load_model(model_name)
+                    
+                    if progress_callback:
+                        progress_callback(f"مدل {model_name} با موفقیت دانلود شد")
+                    
+                    return True, f"مدل {model_name} با موفقیت دانلود شد"
+                    
+                except Exception as e:
+                    if attempt < max_retries - 1:
+                        if progress_callback:
+                            progress_callback(f"خطا در تلاش {attempt + 1}: {str(e)[:50]}... تلاش مجدد...")
+                        import time
+                        time.sleep(2)  # صبر 2 ثانیه قبل از تلاش مجدد
+                        continue
+                    else:
+                        raise e
             
         except Exception as e:
-            return False, f"خطا در دانلود Whisper: {str(e)}"
+            error_msg = str(e)
+            if "SSL" in error_msg or "EOF" in error_msg:
+                return False, f"خطای اتصال SSL: {error_msg}\n\nراه‌حل‌های پیشنهادی:\n1. اتصال اینترنت خود را بررسی کنید\n2. VPN را خاموش کنید\n3. فایروال را بررسی کنید\n4. دوباره تلاش کنید"
+            else:
+                return False, f"خطا در دانلود Whisper: {error_msg}"
     
     @staticmethod
     def _download_vosk_model(model_id, model_info, progress_callback=None):
@@ -567,6 +634,36 @@ class ModelDownloader:
             
         except Exception as e:
             return False, f"خطا در دانلود: {str(e)}"
+    
+    @staticmethod
+    def _download_huggingface_model(model_id, model_info, progress_callback=None):
+        """دانلود مدل Hugging Face با نمایش نوتیفیکیشن ساده"""
+        try:
+            from transformers import AutoModel, AutoTokenizer
+            
+            # استخراج نام مدل از URL
+            model_url = model_info["url"]
+            if not model_url.startswith("huggingface://"):
+                return False, "URL مدل Hugging Face نامعتبر است"
+            
+            model_name = model_url.replace("huggingface://", "")
+            
+            if progress_callback:
+                progress_callback(f"در حال دانلود {model_info['name']} ({model_info['size']})...")
+            
+            # دانلود tokenizer
+            tokenizer = AutoTokenizer.from_pretrained(model_name, force_download=False)
+            
+            # دانلود مدل
+            model = AutoModel.from_pretrained(model_name, force_download=False)
+            
+            if progress_callback:
+                progress_callback(f"مدل {model_name} با موفقیت دانلود شد")
+            
+            return True, f"مدل {model_name} با موفقیت دانلود شد"
+            
+        except Exception as e:
+            return False, f"خطا در دانلود Hugging Face: {str(e)}"
     
     @staticmethod
     def is_model_downloaded(model_id):
@@ -633,7 +730,7 @@ class ModelDownloader:
                                             snapshot_path = os.path.join(snapshots_dir, snapshot)
                                             if os.path.isdir(snapshot_path):
                                                 # بررسی وجود فایل‌های ضروری
-                                                required_files = ["config.json", "tokenizer.json", "tokenizer_config.json"]
+                                                required_files = ["config.json"]
                                                 has_required = all(os.path.exists(os.path.join(snapshot_path, f)) for f in required_files)
                                                 
                                                 # بررسی وجود فایل مدل (pytorch_model.bin یا model.safetensors)
@@ -643,21 +740,56 @@ class ModelDownloader:
                                                 if has_required and has_model:
                                                     # تست بارگذاری برای اطمینان از سلامت فایل
                                                     try:
+                                                        # تست بارگذاری tokenizer
                                                         AutoTokenizer.from_pretrained(snapshot_path, local_files_only=True)
+                                                        # تست بارگذاری مدل
+                                                        AutoModel.from_pretrained(snapshot_path, local_files_only=True)
                                                         return True
-                                                    except:
-                                                        # فایل خراب است، حذف کن
-                                                        import shutil
-                                                        shutil.rmtree(snapshot_path)
+                                                    except Exception as e:
+                                                        # فایل خراب است، اما حذف نکن - فقط False برگردان
+                                                        print(f"مدل خراب تشخیص داده شد: {e}")
                                                         return False
                     
                     return False
                 
                 return False
-            except:
+            except Exception as e:
+                print(f"خطا در بررسی مدل HuggingFace: {e}")
                 return False
         
         return False
+    
+    @staticmethod
+    def get_model_status(model_id):
+        """دریافت وضعیت دقیق مدل"""
+        if model_id not in ModelDownloader.DOWNLOADABLE_MODELS:
+            return "نامشخص", "مدل پشتیبانی نمی‌شود"
+        
+        model_info = ModelDownloader.DOWNLOADABLE_MODELS[model_id]
+        
+        try:
+            if ModelDownloader.is_model_downloaded(model_id):
+                return "دانلود شده", "✅ مدل آماده استفاده است"
+            else:
+                return "دانلود نشده", "❌ مدل دانلود نشده است"
+        except Exception as e:
+            return "خطا", f"❌ خطا در بررسی: {str(e)}"
+    
+    @staticmethod
+    def check_network_connection():
+        """بررسی اتصال شبکه"""
+        try:
+            import urllib.request
+            import socket
+            
+            # تنظیم timeout کوتاه
+            socket.setdefaulttimeout(5)
+            
+            # تست اتصال به یک سایت معتبر
+            urllib.request.urlopen('https://www.google.com', timeout=5)
+            return True, "اتصال شبکه برقرار است"
+        except Exception as e:
+            return False, f"مشکل در اتصال شبکه: {str(e)}"
 
 class ModelDownloadDialog(QDialog):
     """دیالوگ دانلود مدل با نوار پیشرفت"""
@@ -802,6 +934,9 @@ class ModelDownloadThread(QThread):
         """دانلود مدل Whisper با نوار پیشرفت"""
         try:
             import whisper
+            import ssl
+            import urllib.request
+            import socket
             
             model_name = self.model_id.replace("whisper_", "")
             if model_name == "large_v2":
@@ -809,19 +944,45 @@ class ModelDownloadThread(QThread):
             elif model_name == "large_v3":
                 model_name = "large-v3"
             
+            self.status.emit("تنظیم اتصال امن...")
+            self.progress.emit(10)
+            
+            # تنظیم SSL برای حل مشکل SSL
+            ModelDownloader._setup_ssl_context()
+            
             self.status.emit(f"در حال دانلود مدل Whisper {model_name}...")
             self.progress.emit(20)
             
-            # دانلود مدل
-            model = whisper.load_model(model_name)
-            
-            self.progress.emit(100)
-            self.status.emit("دانلود کامل شد!")
-            
-            return True, f"مدل {model_name} با موفقیت دانلود شد"
+            # تلاش برای دانلود با retry
+            max_retries = 3
+            for attempt in range(max_retries):
+                try:
+                    self.status.emit(f"تلاش {attempt + 1} از {max_retries}...")
+                    self.progress.emit(30 + (attempt * 20))
+                    
+                    # دانلود مدل
+                    model = whisper.load_model(model_name)
+                    
+                    self.progress.emit(100)
+                    self.status.emit("دانلود کامل شد!")
+                    
+                    return True, f"مدل {model_name} با موفقیت دانلود شد"
+                    
+                except Exception as e:
+                    if attempt < max_retries - 1:
+                        self.status.emit(f"خطا در تلاش {attempt + 1}: {str(e)[:50]}... تلاش مجدد...")
+                        import time
+                        time.sleep(2)  # صبر 2 ثانیه قبل از تلاش مجدد
+                        continue
+                    else:
+                        raise e
             
         except Exception as e:
-            return False, f"خطا در دانلود Whisper: {str(e)}"
+            error_msg = str(e)
+            if "SSL" in error_msg or "EOF" in error_msg:
+                return False, f"خطای اتصال SSL: {error_msg}\n\nراه‌حل‌های پیشنهادی:\n1. اتصال اینترنت خود را بررسی کنید\n2. VPN را خاموش کنید\n3. فایروال را بررسی کنید\n4. دوباره تلاش کنید"
+            else:
+                return False, f"خطا در دانلود Whisper: {error_msg}"
     
     def _download_vosk_with_progress(self):
         """دانلود مدل Vosk با نوار پیشرفت"""
@@ -895,9 +1056,24 @@ class ModelDownloadThread(QThread):
             
             model_name = model_url.replace("huggingface://", "")
             
+            # بررسی اولیه - آیا مدل قبلاً دانلود شده؟
+            self.status.emit("بررسی وجود مدل...")
+            self.progress.emit(10)
+            
+            try:
+                # تست بارگذاری بدون دانلود مجدد
+                tokenizer = AutoTokenizer.from_pretrained(model_name, local_files_only=True)
+                model = AutoModel.from_pretrained(model_name, local_files_only=True)
+                self.progress.emit(100)
+                self.status.emit("مدل قبلاً دانلود شده است!")
+                return True, f"مدل {model_name} قبلاً دانلود شده است"
+            except:
+                # مدل موجود نیست، ادامه دانلود
+                pass
+            
             # پاک کردن cache خراب قبل از دانلود
             self.status.emit("بررسی و پاک کردن cache خراب...")
-            self.progress.emit(10)
+            self.progress.emit(15)
             self._clean_corrupted_cache(model_name)
             
             self.status.emit(f"در حال دانلود مدل Hugging Face {model_name}...")
@@ -906,12 +1082,23 @@ class ModelDownloadThread(QThread):
             # دانلود tokenizer
             self.status.emit("در حال دانلود tokenizer...")
             self.progress.emit(40)
-            tokenizer = AutoTokenizer.from_pretrained(model_name, force_download=True)
+            tokenizer = AutoTokenizer.from_pretrained(model_name, force_download=False)
             
             # دانلود مدل
             self.status.emit("در حال دانلود مدل...")
             self.progress.emit(70)
-            model = AutoModel.from_pretrained(model_name, force_download=True)
+            model = AutoModel.from_pretrained(model_name, force_download=False)
+            
+            # اعتبارسنجی نهایی
+            self.status.emit("اعتبارسنجی مدل...")
+            self.progress.emit(90)
+            
+            # تست بارگذاری مجدد برای اطمینان
+            try:
+                AutoTokenizer.from_pretrained(model_name, local_files_only=True)
+                AutoModel.from_pretrained(model_name, local_files_only=True)
+            except Exception as e:
+                return False, f"مدل دانلود شد اما خراب است: {str(e)}"
             
             self.progress.emit(100)
             self.status.emit("دانلود کامل شد!")
@@ -937,11 +1124,30 @@ class ModelDownloadThread(QThread):
                 if model_cache_name in item:
                     model_cache_dir = os.path.join(cache_dir, item)
                     if os.path.exists(model_cache_dir):
-                        # پاک کردن فولدر مدل
-                        shutil.rmtree(model_cache_dir)
+                        # بررسی snapshots و حذف فقط snapshot های خراب
+                        snapshots_dir = os.path.join(model_cache_dir, "snapshots")
+                        if os.path.exists(snapshots_dir):
+                            for snapshot in os.listdir(snapshots_dir):
+                                snapshot_path = os.path.join(snapshots_dir, snapshot)
+                                if os.path.isdir(snapshot_path):
+                                    # بررسی سلامت snapshot
+                                    try:
+                                        from transformers import AutoTokenizer, AutoModel
+                                        AutoTokenizer.from_pretrained(snapshot_path, local_files_only=True)
+                                        AutoModel.from_pretrained(snapshot_path, local_files_only=True)
+                                        # اگر به اینجا رسید، snapshot سالم است
+                                        continue
+                                    except:
+                                        # snapshot خراب است، حذف کن
+                                        try:
+                                            shutil.rmtree(snapshot_path)
+                                            print(f"Snapshot خراب حذف شد: {snapshot_path}")
+                                        except:
+                                            pass
                         break
         except Exception as e:
             # اگر پاک کردن cache مشکل داشت، ادامه بده
+            print(f"خطا در پاک کردن cache: {e}")
             pass
 
 class DownloadedModelsManager(QDialog):
