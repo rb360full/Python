@@ -1,11 +1,23 @@
+# Core dependencies
 pip install openai-whisper PySide6 arabic-reshaper python-bidi
 pip install numpy regex tqdm
 pip install persian-tools
 pip install soundfile
+pip install requests tqdm
 
+# Speech Recognition Models
 pip install google-cloud-speech
 pip install vosk
 pip install azure-cognitiveservices-speech
 pip install assemblyai
 
-pip install requests tqdm
+# New Model Dependencies
+pip install transformers torch
+pip install SpeechRecognition
+pip install torchaudio
+pip install kaldi-io
+pip install librosa
+pip install scipy
+
+# Optional dependencies for better performance
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu

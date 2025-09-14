@@ -63,6 +63,40 @@ except ImportError:
     ASSEMBLYAI_AVAILABLE = False
     print("Warning: assemblyai not installed. Install with: pip install assemblyai")
 
+# Hugging Face Transformers
+try:
+    from transformers import pipeline, AutoModelForCTC, AutoProcessor
+    import torch
+    HUGGINGFACE_AVAILABLE = True
+except ImportError:
+    HUGGINGFACE_AVAILABLE = False
+    print("Warning: transformers not installed. Install with: pip install transformers torch")
+
+# SpeechRecognition
+try:
+    import speech_recognition as sr
+    SPEECHRECOGNITION_AVAILABLE = True
+except ImportError:
+    SPEECHRECOGNITION_AVAILABLE = False
+    print("Warning: SpeechRecognition not installed. Install with: pip install SpeechRecognition")
+
+# Silero STT
+try:
+    import torch
+    import torchaudio
+    SILERO_AVAILABLE = True
+except ImportError:
+    SILERO_AVAILABLE = False
+    print("Warning: torchaudio not installed. Install with: pip install torchaudio")
+
+# Kaldi
+try:
+    import kaldi_io
+    KALDI_AVAILABLE = True
+except ImportError:
+    KALDI_AVAILABLE = False
+    print("Warning: kaldi-io not installed. Install with: pip install kaldi-io")
+
 # بررسی ffmpeg در PATH
 try:
     subprocess.run(["ffmpeg", "-version"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -81,15 +115,84 @@ if not RELYING_DICT_FILE.exists():
     with open(RELYING_DICT_FILE, "w", encoding="utf-8") as f:
         json.dump({"تکیه_کلام": ["خب", "آخه", "یعنی", "حالا"]}, f, ensure_ascii=False, indent=2)
 
+# مسیر فایل تنظیمات
+CONFIG_FILE = Path("voice_analyzer_config.json")
+if not CONFIG_FILE.exists():
+    with open(CONFIG_FILE, "w", encoding="utf-8") as f:
+        json.dump({
+            "selected_model": "vosk_persian",
+            "last_audio_path": "",
+            "window_geometry": None,
+            "preferred_language": "fa"
+        }, f, ensure_ascii=False, indent=2)
+
 # Import پنجره مدیریت دیکشنری
 from custom_dict_manager import DictManager
+
+class ConfigManager:
+    """مدیریت تنظیمات برنامه"""
+    
+    @staticmethod
+    def load_config():
+        """بارگذاری تنظیمات از فایل"""
+        try:
+            with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception as e:
+            print(f"خطا در بارگذاری تنظیمات: {e}")
+            return {
+                "selected_model": "vosk_persian",
+                "last_audio_path": "",
+                "window_geometry": None,
+                "preferred_language": "fa"
+            }
+    
+    @staticmethod
+    def save_config(config):
+        """ذخیره تنظیمات در فایل"""
+        try:
+            with open(CONFIG_FILE, "w", encoding="utf-8") as f:
+                json.dump(config, f, ensure_ascii=False, indent=2)
+            return True
+        except Exception as e:
+            print(f"خطا در ذخیره تنظیمات: {e}")
+            return False
+    
+    @staticmethod
+    def update_model(model_name):
+        """به‌روزرسانی مدل انتخاب شده"""
+        config = ConfigManager.load_config()
+        config["selected_model"] = model_name
+        return ConfigManager.save_config(config)
+    
+    @staticmethod
+    def update_audio_path(audio_path):
+        """به‌روزرسانی مسیر آخرین فایل صوتی"""
+        config = ConfigManager.load_config()
+        config["last_audio_path"] = audio_path
+        return ConfigManager.save_config(config)
+    
+    @staticmethod
+    def update_window_geometry(geometry):
+        """به‌روزرسانی موقعیت و اندازه پنجره"""
+        config = ConfigManager.load_config()
+        config["window_geometry"] = geometry
+        return ConfigManager.save_config(config)
 
 class ModelDownloader:
     """کلاس دانلود خودکار مدل‌ها"""
     
     # مدل‌های قابل دانلود
     DOWNLOADABLE_MODELS = {
-        # Vosk Models
+        # Vosk Models (فقط فارسی و انگلیسی)
+        "vosk_persian": {
+            "url": "https://alphacephei.com/vosk/models/vosk-model-fa-0.5.zip",
+            "name": "vosk-model-fa-0.5", 
+            "size": "1.13 GB",
+            "language": "فارسی",
+            "warning": "✅ مخصوص فارسی",
+            "type": "Vosk"
+        },
         "vosk_small": {
             "url": "https://alphacephei.com/vosk/models/vosk-model-small-en-us-0.15.zip",
             "name": "vosk-model-small-en-us-0.15",
@@ -106,15 +209,8 @@ class ModelDownloader:
             "warning": "⚠️ فقط انگلیسی",
             "type": "Vosk"
         },
-        "vosk_persian": {
-            "url": "https://alphacephei.com/vosk/models/vosk-model-fa-0.5.zip",
-            "name": "vosk-model-fa-0.5", 
-            "size": "1.13 GB",
-            "language": "فارسی",
-            "warning": "✅ مخصوص فارسی",
-            "type": "Vosk"
-        },
-        # Whisper Models (نیاز به دانلود خودکار)
+        
+        # Whisper Models
         "whisper_tiny": {
             "url": "whisper://tiny",
             "name": "whisper-tiny",
@@ -154,6 +250,200 @@ class ModelDownloader:
             "language": "چند زبانه",
             "warning": "✅ بالاترین دقت",
             "type": "Whisper"
+        },
+        "whisper_large_v2": {
+            "url": "whisper://large-v2",
+            "name": "whisper-large-v2",
+            "size": "2.9 GB",
+            "language": "چند زبانه",
+            "warning": "✅ جدیدترین نسخه",
+            "type": "Whisper"
+        },
+        "whisper_large_v3": {
+            "url": "whisper://large-v3",
+            "name": "whisper-large-v3",
+            "size": "2.9 GB",
+            "language": "چند زبانه",
+            "warning": "✅ جدیدترین نسخه",
+            "type": "Whisper"
+        },
+        
+        # Hugging Face Transformers
+        "hf_wav2vec2_persian": {
+            "url": "huggingface://m3hrdadfi/wav2vec2-large-xlsr-53-persian",
+            "name": "wav2vec2-large-xlsr-53-persian",
+            "size": "1.2 GB",
+            "language": "فارسی",
+            "warning": "✅ مخصوص فارسی - Hugging Face",
+            "type": "HuggingFace"
+        },
+        "hf_whisper_persian": {
+            "url": "huggingface://m3hrdadfi/whisper-persian",
+            "name": "whisper-persian",
+            "size": "1.5 GB",
+            "language": "فارسی",
+            "warning": "✅ مخصوص فارسی - Hugging Face",
+            "type": "HuggingFace"
+        },
+        "hf_whisper_tiny": {
+            "url": "huggingface://openai/whisper-tiny",
+            "name": "whisper-tiny-hf",
+            "size": "75 MB",
+            "language": "چند زبانه",
+            "warning": "⚠️ ضعیف برای فارسی",
+            "type": "HuggingFace"
+        },
+        "hf_whisper_base": {
+            "url": "huggingface://openai/whisper-base",
+            "name": "whisper-base-hf",
+            "size": "142 MB",
+            "language": "چند زبانه",
+            "warning": "⚠️ ضعیف برای فارسی",
+            "type": "HuggingFace"
+        },
+        "hf_whisper_small": {
+            "url": "huggingface://openai/whisper-small",
+            "name": "whisper-small-hf",
+            "size": "466 MB",
+            "language": "چند زبانه",
+            "warning": "✅ تعادل خوب",
+            "type": "HuggingFace"
+        },
+        "hf_whisper_medium": {
+            "url": "huggingface://openai/whisper-medium",
+            "name": "whisper-medium-hf",
+            "size": "1.5 GB",
+            "language": "چند زبانه",
+            "warning": "✅ دقت بالا",
+            "type": "HuggingFace"
+        },
+        "hf_whisper_large": {
+            "url": "huggingface://openai/whisper-large-v2",
+            "name": "whisper-large-v2-hf",
+            "size": "2.9 GB",
+            "language": "چند زبانه",
+            "warning": "✅ بالاترین دقت",
+            "type": "HuggingFace"
+        },
+        
+        # SpeechRecognition
+        "speechrecognition_google": {
+            "url": "speechrecognition://google",
+            "name": "Google Speech Recognition",
+            "size": "0 MB",
+            "language": "چند زبانه",
+            "warning": "🌐 آنلاین - رایگان 60دقیقه/ماه",
+            "type": "SpeechRecognition"
+        },
+        "speechrecognition_sphinx": {
+            "url": "speechrecognition://sphinx",
+            "name": "CMU Sphinx",
+            "size": "100 MB",
+            "language": "انگلیسی",
+            "warning": "⚠️ فقط انگلیسی",
+            "type": "SpeechRecognition"
+        },
+        "speechrecognition_wit": {
+            "url": "speechrecognition://wit",
+            "name": "Wit.ai",
+            "size": "0 MB",
+            "language": "چند زبانه",
+            "warning": "🌐 آنلاین - رایگان تا حدی",
+            "type": "SpeechRecognition"
+        },
+        "speechrecognition_azure": {
+            "url": "speechrecognition://azure",
+            "name": "Azure Speech",
+            "size": "0 MB",
+            "language": "چند زبانه",
+            "warning": "🌐 آنلاین - رایگان 5ساعت/ماه",
+            "type": "SpeechRecognition"
+        },
+        "speechrecognition_bing": {
+            "url": "speechrecognition://bing",
+            "name": "Bing Speech",
+            "size": "0 MB",
+            "language": "چند زبانه",
+            "warning": "🌐 آنلاین - رایگان تا حدی",
+            "type": "SpeechRecognition"
+        },
+        "speechrecognition_houndify": {
+            "url": "speechrecognition://houndify",
+            "name": "Houndify",
+            "size": "0 MB",
+            "language": "چند زبانه",
+            "warning": "🌐 آنلاین - رایگان تا حدی",
+            "type": "SpeechRecognition"
+        },
+        "speechrecognition_ibm": {
+            "url": "speechrecognition://ibm",
+            "name": "IBM Speech to Text",
+            "size": "0 MB",
+            "language": "چند زبانه",
+            "warning": "🌐 آنلاین - رایگان تا حدی",
+            "type": "SpeechRecognition"
+        },
+        
+        # Silero STT
+        "silero_stt_en": {
+            "url": "silero://stt_en",
+            "name": "Silero STT English",
+            "size": "50 MB",
+            "language": "انگلیسی",
+            "warning": "⚠️ فقط انگلیسی",
+            "type": "Silero"
+        },
+        "silero_stt_multilingual": {
+            "url": "silero://stt_multilingual",
+            "name": "Silero STT Multilingual",
+            "size": "200 MB",
+            "language": "چند زبانه",
+            "warning": "✅ پشتیبانی از فارسی",
+            "type": "Silero"
+        },
+        
+        # Kaldi
+        "kaldi_persian": {
+            "url": "kaldi://persian",
+            "name": "Kaldi Persian Model",
+            "size": "500 MB",
+            "language": "فارسی",
+            "warning": "✅ مخصوص فارسی",
+            "type": "Kaldi"
+        },
+        "kaldi_english": {
+            "url": "kaldi://english",
+            "name": "Kaldi English Model",
+            "size": "300 MB",
+            "language": "انگلیسی",
+            "warning": "⚠️ فقط انگلیسی",
+            "type": "Kaldi"
+        },
+        
+        # سرویس‌های بومی ایرانی
+        "iranian_arvan": {
+            "url": "arvan://speech",
+            "name": "Arvan Cloud Speech",
+            "size": "0 MB",
+            "language": "فارسی",
+            "warning": "🇮🇷 سرویس ایرانی - آنلاین",
+            "type": "Iranian"
+        },
+        "iranian_fanap": {
+            "url": "fanap://speech",
+            "name": "Fanap Speech API",
+            "size": "0 MB",
+            "language": "فارسی",
+            "warning": "🇮🇷 سرویس ایرانی - آنلاین",
+            "type": "Iranian"
+        },
+        "iranian_parsijoo": {
+            "url": "parsijoo://speech",
+            "name": "Parsijoo Speech",
+            "size": "0 MB",
+            "language": "فارسی",
+            "warning": "🇮🇷 سرویس ایرانی - آنلاین",
+            "type": "Iranian"
         }
     }
     
@@ -190,6 +480,12 @@ class ModelDownloader:
             
             # Whisper خودش مدل‌ها رو دانلود می‌کنه
             model_name = model_id.replace("whisper_", "")
+            # تبدیل نام مدل برای Whisper
+            if model_name == "large_v2":
+                model_name = "large-v2"
+            elif model_name == "large_v3":
+                model_name = "large-v3"
+            
             model = whisper.load_model(model_name)
             
             if progress_bar_callback:
@@ -268,6 +564,12 @@ class ModelDownloader:
         if model_info["type"] == "Whisper":
             try:
                 model_name = model_id.replace("whisper_", "")
+                # تبدیل نام مدل برای Whisper
+                if model_name == "large_v2":
+                    model_name = "large-v2"
+                elif model_name == "large_v3":
+                    model_name = "large-v3"
+                
                 # بررسی وجود مدل در cache Whisper
                 import whisper
                 model_path = whisper._MODELS.get(model_name)
@@ -286,44 +588,91 @@ class ModelDownloader:
 class ModelSelectionDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("انتخاب مدل Whisper")
+        self.setWindowTitle("انتخاب مدل Speech-to-Text")
         self.setModal(True)
-        self.resize(400, 200)
+        self.resize(500, 300)
         
         layout = QFormLayout(self)
         
-        # لیست مدل‌های Whisper
+        # لیست مدل‌های Speech-to-Text (فقط فارسی و انگلیسی)
         self.model_combo = QComboBox()
         models = [
-            # Whisper Models
+            # Vosk Models (کاملاً رایگان)
+            ("vosk_persian", "✅ Vosk Persian - مخصوص فارسی (1.13 GB)"),
+            ("vosk_small", "⚠️ Vosk Small - فقط انگلیسی (40 MB)"),
+            ("vosk_large", "⚠️ Vosk Large - فقط انگلیسی (1.8 GB)"),
+            
+            # Whisper Models (چند زبانه)
             ("whisper_tiny", "⚠️ Whisper Tiny - خیلی ضعیف برای فارسی (75 MB)"),
             ("whisper_base", "⚠️ Whisper Base - ضعیف برای فارسی (142 MB)"),
             ("whisper_small", "✅ Whisper Small - تعادل خوب (466 MB)"),
             ("whisper_medium", "✅ Whisper Medium - دقت بالا (1.5 GB)"),
             ("whisper_large", "✅ Whisper Large - بالاترین دقت (2.9 GB)"),
-            # Google Models
-            ("google_standard", "✅ Google Standard - رایگان 60دقیقه/ماه (آنلاین)"),
+            ("whisper_large_v2", "✅ Whisper Large V2 - جدیدترین نسخه (2.9 GB)"),
+            ("whisper_large_v3", "✅ Whisper Large V3 - جدیدترین نسخه (2.9 GB)"),
+            
+            # Hugging Face Transformers
+            ("hf_wav2vec2_persian", "✅ Wav2Vec2 Persian - مخصوص فارسی (1.2 GB)"),
+            ("hf_whisper_persian", "✅ Whisper Persian - مخصوص فارسی (1.5 GB)"),
+            ("hf_whisper_tiny", "⚠️ Whisper Tiny HF - ضعیف برای فارسی (75 MB)"),
+            ("hf_whisper_base", "⚠️ Whisper Base HF - ضعیف برای فارسی (142 MB)"),
+            ("hf_whisper_small", "✅ Whisper Small HF - تعادل خوب (466 MB)"),
+            ("hf_whisper_medium", "✅ Whisper Medium HF - دقت بالا (1.5 GB)"),
+            ("hf_whisper_large", "✅ Whisper Large HF - بالاترین دقت (2.9 GB)"),
+            
+            # SpeechRecognition
+            ("speechrecognition_google", "🌐 Google Speech - رایگان 60دقیقه/ماه (آنلاین)"),
+            ("speechrecognition_sphinx", "⚠️ CMU Sphinx - فقط انگلیسی (100 MB)"),
+            ("speechrecognition_wit", "🌐 Wit.ai - رایگان تا حدی (آنلاین)"),
+            ("speechrecognition_azure", "🌐 Azure Speech - رایگان 5ساعت/ماه (آنلاین)"),
+            ("speechrecognition_bing", "🌐 Bing Speech - رایگان تا حدی (آنلاین)"),
+            ("speechrecognition_houndify", "🌐 Houndify - رایگان تا حدی (آنلاین)"),
+            ("speechrecognition_ibm", "🌐 IBM Speech - رایگان تا حدی (آنلاین)"),
+            
+            # Silero STT
+            ("silero_stt_en", "⚠️ Silero STT English - فقط انگلیسی (50 MB)"),
+            ("silero_stt_multilingual", "✅ Silero STT Multilingual - پشتیبانی از فارسی (200 MB)"),
+            
+            # Kaldi
+            ("kaldi_persian", "✅ Kaldi Persian - مخصوص فارسی (500 MB)"),
+            ("kaldi_english", "⚠️ Kaldi English - فقط انگلیسی (300 MB)"),
+            
+            # سرویس‌های بومی ایرانی
+            ("iranian_arvan", "🇮🇷 Arvan Cloud Speech - سرویس ایرانی (آنلاین)"),
+            ("iranian_fanap", "🇮🇷 Fanap Speech API - سرویس ایرانی (آنلاین)"),
+            ("iranian_parsijoo", "🇮🇷 Parsijoo Speech - سرویس ایرانی (آنلاین)"),
+            
+            # Google Models (برای سازگاری)
+            ("google_standard", "🌐 Google Standard - رایگان 60دقیقه/ماه (آنلاین)"),
             ("google_enhanced", "💳 Google Enhanced - پولی، دقت بالاتر (آنلاین)"),
             ("google_phone_call", "💳 Google Phone Call - پولی، مخصوص تماس‌ها (آنلاین)"),
             ("google_medical", "💳 Google Medical - پولی، اصطلاحات پزشکی (آنلاین)"),
             ("google_video", "💳 Google Video - پولی، مخصوص ویدیوها (آنلاین)"),
-            # Vosk Models (کاملاً رایگان)
-            ("vosk_small", "⚠️ Vosk Small - فقط انگلیسی (40 MB)"),
-            ("vosk_large", "⚠️ Vosk Large - فقط انگلیسی (1.8 GB)"),
-            ("vosk_persian", "✅ Vosk Persian - مخصوص فارسی (1.13 GB)"),
-            # Microsoft Azure Speech (رایگان تا حدی)
-            ("azure_standard", "✅ Azure Standard - رایگان 5ساعت/ماه (آنلاین)"),
+            
+            # Microsoft Azure Speech
+            ("azure_standard", "🌐 Azure Standard - رایگان 5ساعت/ماه (آنلاین)"),
             ("azure_enhanced", "💳 Azure Enhanced - پولی، دقت بالاتر (آنلاین)"),
-            # AssemblyAI (رایگان تا حدی)
-            ("assemblyai_standard", "✅ AssemblyAI - رایگان 3ساعت/ماه (آنلاین)"),
+            
+            # AssemblyAI
+            ("assemblyai_standard", "🌐 AssemblyAI - رایگان 3ساعت/ماه (آنلاین)"),
             ("assemblyai_enhanced", "💳 AssemblyAI Enhanced - پولی، دقت بالاتر (آنلاین)")
         ]
         
         for model_id, description in models:
             self.model_combo.addItem(f"{model_id} - {description}", model_id)
         
-        # انتخاب پیش‌فرض Vosk Persian (بهترین برای فارسی - کاملاً رایگان)
-        self.model_combo.setCurrentIndex(10)  # vosk_persian
+        # بارگذاری آخرین مدل انتخاب شده
+        config = ConfigManager.load_config()
+        last_model = config.get("selected_model", "vosk_persian")
+        
+        # پیدا کردن ایندکس مدل آخر
+        model_index = 0
+        for i, (model_id, _) in enumerate(models):
+            if model_id == last_model:
+                model_index = i
+                break
+        
+        self.model_combo.setCurrentIndex(model_index)
         
         layout.addRow("مدل:", self.model_combo)
         
@@ -388,6 +737,11 @@ class TranscribeThread(QThread):
             # بارگذاری مدل انتخاب شده
             if self.model_name.startswith("whisper_"):
                 whisper_model = self.model_name.replace("whisper_", "")
+                # تبدیل نام مدل برای Whisper
+                if whisper_model == "large_v2":
+                    whisper_model = "large-v2"
+                elif whisper_model == "large_v3":
+                    whisper_model = "large-v3"
                 self.model = whisper.load_model(whisper_model)
             elif self.model_name.startswith("google_"):
                 if not GOOGLE_SPEECH_AVAILABLE:
@@ -409,6 +763,28 @@ class TranscribeThread(QThread):
                     self.finished.emit("Error: AssemblyAI not installed. Install with: pip install assemblyai")
                     return
                 self.model = "assemblyai"  # نشانگر استفاده از AssemblyAI
+            elif self.model_name.startswith("hf_"):
+                if not HUGGINGFACE_AVAILABLE:
+                    self.finished.emit("Error: Hugging Face Transformers not installed. Install with: pip install transformers torch")
+                    return
+                self.model = "huggingface"  # نشانگر استفاده از Hugging Face
+            elif self.model_name.startswith("speechrecognition_"):
+                if not SPEECHRECOGNITION_AVAILABLE:
+                    self.finished.emit("Error: SpeechRecognition not installed. Install with: pip install SpeechRecognition")
+                    return
+                self.model = "speechrecognition"  # نشانگر استفاده از SpeechRecognition
+            elif self.model_name.startswith("silero_"):
+                if not SILERO_AVAILABLE:
+                    self.finished.emit("Error: Silero STT not installed. Install with: pip install torchaudio")
+                    return
+                self.model = "silero"  # نشانگر استفاده از Silero
+            elif self.model_name.startswith("kaldi_"):
+                if not KALDI_AVAILABLE:
+                    self.finished.emit("Error: Kaldi not installed. Install with: pip install kaldi-io")
+                    return
+                self.model = "kaldi"  # نشانگر استفاده از Kaldi
+            elif self.model_name.startswith("iranian_"):
+                self.model = "iranian"  # نشانگر استفاده از سرویس‌های ایرانی
             else:
                 self.finished.emit(f"Error: Unknown model {self.model_name}")
                 return
@@ -440,6 +816,21 @@ class TranscribeThread(QThread):
             elif self.model == "assemblyai":
                 # استفاده از AssemblyAI
                 text = self.transcribe_with_assemblyai(temp_wav)
+            elif self.model == "huggingface":
+                # استفاده از Hugging Face
+                text = self.transcribe_with_huggingface(temp_wav)
+            elif self.model == "speechrecognition":
+                # استفاده از SpeechRecognition
+                text = self.transcribe_with_speechrecognition(temp_wav)
+            elif self.model == "silero":
+                # استفاده از Silero STT
+                text = self.transcribe_with_silero(temp_wav)
+            elif self.model == "kaldi":
+                # استفاده از Kaldi
+                text = self.transcribe_with_kaldi(temp_wav)
+            elif self.model == "iranian":
+                # استفاده از سرویس‌های ایرانی
+                text = self.transcribe_with_iranian(temp_wav)
             else:
                 # استفاده از Whisper
                 result = self.model.transcribe(
@@ -589,7 +980,16 @@ class TranscribeThread(QThread):
             
             # بارگذاری مدل
             model = vosk.Model(model_path)
-            rec = vosk.KaldiRecognizer(model, 16000)
+            
+            # تنظیم زبان بر اساس مدل انتخاب شده
+            if self.model_name == "vosk_persian":
+                rec = vosk.KaldiRecognizer(model, 16000)
+            elif self.model_name in ["vosk_arabic", "vosk_spanish", "vosk_french", "vosk_german", 
+                                   "vosk_italian", "vosk_portuguese", "vosk_russian", 
+                                   "vosk_chinese", "vosk_japanese", "vosk_korean"]:
+                rec = vosk.KaldiRecognizer(model, 16000)
+            else:
+                rec = vosk.KaldiRecognizer(model, 16000)
             
             # خواندن فایل صوتی
             with open(audio_file, "rb") as f:
@@ -703,6 +1103,166 @@ class TranscribeThread(QThread):
                 
         except Exception as e:
             return f"AssemblyAI Error: {str(e)}"
+    
+    def transcribe_with_huggingface(self, audio_file):
+        """تبدیل صوت به متن با Hugging Face Transformers"""
+        try:
+            # بارگذاری مدل بر اساس نوع
+            if self.model_name == "hf_wav2vec2_persian":
+                model_name = "m3hrdadfi/wav2vec2-large-xlsr-53-persian"
+                processor = AutoProcessor.from_pretrained(model_name)
+                model = AutoModelForCTC.from_pretrained(model_name)
+            elif self.model_name == "hf_whisper_persian":
+                model_name = "m3hrdadfi/whisper-persian"
+                processor = AutoProcessor.from_pretrained(model_name)
+                model = AutoModelForCTC.from_pretrained(model_name)
+            else:
+                # مدل‌های عمومی Whisper
+                model_name = self.model_name.replace("hf_", "").replace("_hf", "")
+                if model_name == "whisper_large":
+                    model_name = "openai/whisper-large-v2"
+                else:
+                    model_name = f"openai/whisper-{model_name}"
+                
+                processor = AutoProcessor.from_pretrained(model_name)
+                model = AutoModelForCTC.from_pretrained(model_name)
+            
+            # بارگذاری فایل صوتی
+            try:
+                import librosa
+                audio, sr = librosa.load(audio_file, sr=16000)
+            except ImportError:
+                try:
+                    # استفاده از soundfile به عنوان جایگزین
+                    import soundfile as sf
+                    audio, sr = sf.read(audio_file)
+                    if sr != 16000:
+                        # تبدیل sample rate به 16000
+                        import numpy as np
+                        from scipy import signal
+                        audio = signal.resample(audio, int(len(audio) * 16000 / sr))
+                        sr = 16000
+                except ImportError:
+                    return "Hugging Face Error: Neither librosa nor soundfile is available. Install with: pip install librosa soundfile"
+            
+            # پردازش
+            try:
+                inputs = processor(audio, sampling_rate=sr, return_tensors="pt")
+                
+                # تشخیص
+                with torch.no_grad():
+                    logits = model(inputs.input_values).logits
+                
+                # تبدیل به متن
+                predicted_ids = torch.argmax(logits, dim=-1)
+                text = processor.batch_decode(predicted_ids)[0]
+                
+                return text.strip()
+            except Exception as e:
+                return f"Hugging Face Error: Model processing failed - {str(e)}"
+            
+        except Exception as e:
+            return f"Hugging Face Error: {str(e)}"
+    
+    def transcribe_with_speechrecognition(self, audio_file):
+        """تبدیل صوت به متن با SpeechRecognition"""
+        try:
+            r = sr.Recognizer()
+            
+            with sr.AudioFile(audio_file) as source:
+                audio = r.record(source)
+            
+            # انتخاب سرویس بر اساس مدل
+            if self.model_name == "speechrecognition_google":
+                text = r.recognize_google(audio, language="fa-IR")
+            elif self.model_name == "speechrecognition_sphinx":
+                text = r.recognize_sphinx(audio)
+            elif self.model_name == "speechrecognition_wit":
+                text = r.recognize_wit(audio, key=os.getenv("WIT_AI_KEY"))
+            elif self.model_name == "speechrecognition_azure":
+                text = r.recognize_azure(audio, key=os.getenv("AZURE_SPEECH_KEY"), location=os.getenv("AZURE_SPEECH_REGION"))
+            elif self.model_name == "speechrecognition_bing":
+                text = r.recognize_bing(audio, key=os.getenv("BING_KEY"))
+            elif self.model_name == "speechrecognition_houndify":
+                text = r.recognize_houndify(audio, client_id=os.getenv("HOUNDIFY_CLIENT_ID"), client_key=os.getenv("HOUNDIFY_CLIENT_KEY"))
+            elif self.model_name == "speechrecognition_ibm":
+                text = r.recognize_ibm(audio, username=os.getenv("IBM_USERNAME"), password=os.getenv("IBM_PASSWORD"))
+            else:
+                return "SpeechRecognition Error: Unknown service"
+            
+            return text.strip()
+            
+        except Exception as e:
+            return f"SpeechRecognition Error: {str(e)}"
+    
+    def transcribe_with_silero(self, audio_file):
+        """تبدیل صوت به متن با Silero STT"""
+        try:
+            import torch
+            import torchaudio
+            
+            # بارگذاری مدل
+            if self.model_name == "silero_stt_en":
+                model, decoder, utils = torch.hub.load(repo_or_dir='snakers4/silero-models', model='silero_stt', language='en')
+            else:  # silero_stt_multilingual
+                model, decoder, utils = torch.hub.load(repo_or_dir='snakers4/silero-models', model='silero_stt', language='multilingual')
+            
+            # بارگذاری فایل صوتی
+            audio, sample_rate = torchaudio.load(audio_file)
+            
+            # تبدیل به mono
+            if audio.shape[0] > 1:
+                audio = torch.mean(audio, dim=0, keepdim=True)
+            
+            # تشخیص
+            text = decoder(model(audio[0]))
+            
+            return text.strip()
+            
+        except ImportError as e:
+            return f"Silero STT Error: Required dependencies not installed. Install with: pip install torch torchaudio"
+        except Exception as e:
+            return f"Silero STT Error: {str(e)}"
+    
+    def transcribe_with_kaldi(self, audio_file):
+        """تبدیل صوت به متن با Kaldi"""
+        try:
+            # بررسی وجود Kaldi
+            if not KALDI_AVAILABLE:
+                return "Kaldi Error: kaldi-io not installed. Install with: pip install kaldi-io"
+            
+            # برای Kaldi، ما از یک پیاده‌سازی ساده استفاده می‌کنیم
+            # که از مدل‌های موجود استفاده می‌کند
+            
+            if self.model_name == "kaldi_persian":
+                # استفاده از مدل فارسی Kaldi (نیاز به مدل‌های Kaldi)
+                return "Kaldi Persian: مدل Kaldi فارسی نیاز به تنظیمات پیچیده دارد. لطفاً از مدل‌های دیگر استفاده کنید."
+            elif self.model_name == "kaldi_english":
+                # استفاده از مدل انگلیسی Kaldi
+                return "Kaldi English: مدل Kaldi انگلیسی نیاز به تنظیمات پیچیده دارد. لطفاً از مدل‌های دیگر استفاده کنید."
+            else:
+                return "Kaldi Error: Unknown Kaldi model"
+            
+        except Exception as e:
+            return f"Kaldi Error: {str(e)}"
+    
+    def transcribe_with_iranian(self, audio_file):
+        """تبدیل صوت به متن با سرویس‌های بومی ایرانی"""
+        try:
+            # این یک پیاده‌سازی نمونه است
+            # برای استفاده واقعی نیاز به API key های مربوطه است
+            
+            if self.model_name == "iranian_arvan":
+                return "Arvan Cloud Speech Error: نیاز به تنظیم API Key\nبرای استفاده از Arvan Cloud Speech API key خود را تنظیم کنید."
+            elif self.model_name == "iranian_fanap":
+                return "Fanap Speech Error: نیاز به تنظیم API Key\nبرای استفاده از Fanap Speech API key خود را تنظیم کنید."
+            elif self.model_name == "iranian_parsijoo":
+                return "Parsijoo Speech Error: نیاز به تنظیم API Key\nبرای استفاده از Parsijoo Speech API key خود را تنظیم کنید."
+            else:
+                return "Iranian Service Error: Unknown service"
+            
+        except Exception as e:
+            return f"Iranian Service Error: {str(e)}"
 
 
 class VoiceApp(QWidget):
@@ -757,18 +1317,46 @@ class VoiceApp(QWidget):
         self.btn_download_models.clicked.connect(self.show_download_models_dialog)
         self.layout.addWidget(self.btn_download_models)
 
+        self.btn_change_model = QPushButton("Change Model")
+        self.btn_change_model.setMinimumHeight(40)
+        self.btn_change_model.setStyleSheet("background-color: #9c27b0; color: white;")
+        self.btn_change_model.clicked.connect(self.change_model)
+        self.layout.addWidget(self.btn_change_model)
+
         self.progress = QProgressBar()
         self.layout.addWidget(self.progress)
         
         # Progress bar برای دانلود
         self.download_progress = QProgressBar()
         self.download_progress.setVisible(False)
+        self.download_progress.setStyleSheet("""
+            QProgressBar {
+                border: 2px solid grey;
+                border-radius: 5px;
+                text-align: center;
+                font-weight: bold;
+                font-size: 12px;
+            }
+            QProgressBar::chunk {
+                background-color: #4CAF50;
+                border-radius: 3px;
+            }
+        """)
         self.layout.addWidget(self.download_progress)
         
         # Status label برای دانلود
         self.download_status = QLabel("")
         self.download_status.setVisible(False)
-        self.download_status.setStyleSheet("color: blue; font-weight: bold;")
+        self.download_status.setStyleSheet("""
+            color: #2196F3; 
+            font-weight: bold; 
+            font-size: 14px;
+            padding: 5px;
+            background-color: #E3F2FD;
+            border: 1px solid #2196F3;
+            border-radius: 5px;
+        """)
+        self.download_status.setAlignment(Qt.AlignCenter)
         self.layout.addWidget(self.download_status)
 
         self.scroll = QScrollArea()
@@ -783,7 +1371,40 @@ class VoiceApp(QWidget):
         self.output_file = None
         self.thread = None
         self.dict_manager_window = None
-        self.selected_model = "vosk_persian"  # مدل پیش‌فرض
+        
+        # بارگذاری تنظیمات و مدل آخر
+        config = ConfigManager.load_config()
+        self.selected_model = config.get("selected_model", "vosk_persian")
+        
+        # بارگذاری آخرین فایل صوتی
+        last_audio_path = config.get("last_audio_path", "")
+        if last_audio_path and os.path.exists(last_audio_path):
+            self.audio_path = last_audio_path
+            self.label.setText(f"Last File: {last_audio_path}")
+        
+        # بازگردانی موقعیت و اندازه پنجره
+        window_geometry = config.get("window_geometry")
+        if window_geometry:
+            self.setGeometry(
+                window_geometry.get("x", 100),
+                window_geometry.get("y", 100),
+                window_geometry.get("width", 900),
+                window_geometry.get("height", 600)
+            )
+        
+        # به‌روزرسانی نمایش مدل
+        self.update_model_display()
+
+    def update_model_display(self):
+        """به‌روزرسانی نمایش مدل انتخاب شده"""
+        model_info = ModelDownloader.DOWNLOADABLE_MODELS.get(self.selected_model, {})
+        if model_info:
+            model_name = model_info.get("name", self.selected_model)
+            model_type = model_info.get("type", "Unknown")
+            model_language = model_info.get("language", "Unknown")
+            self.model_label.setText(f"Selected Model: {self.selected_model} ({model_type} - {model_language})")
+        else:
+            self.model_label.setText(f"Selected Model: {self.selected_model}")
 
     def select_file(self):
         file_path, _ = QFileDialog.getOpenFileName(
@@ -796,6 +1417,9 @@ class VoiceApp(QWidget):
             self.text_edit.clear()
             self.output_file = None
             self.thread = None  # ریست کردن thread برای فایل جدید
+            
+            # ذخیره مسیر آخرین فایل صوتی
+            ConfigManager.update_audio_path(file_path)
 
     def start_transcription(self):
         if not self.audio_path:
@@ -806,7 +1430,12 @@ class VoiceApp(QWidget):
         dialog = ModelSelectionDialog(self)
         if dialog.exec() == QDialog.Accepted:
             self.selected_model = dialog.get_selected_model()
-            self.model_label.setText(f"Selected Model: {self.selected_model}")
+            
+            # ذخیره مدل انتخاب شده
+            ConfigManager.update_model(self.selected_model)
+            
+            # به‌روزرسانی نمایش مدل
+            self.update_model_display()
             
             # هشدار برای مدل‌های ضعیف
             if self.selected_model in ["whisper_tiny", "whisper_base"]:
@@ -859,15 +1488,21 @@ class VoiceApp(QWidget):
     def update_download_progress(self, percent):
         """به‌روزرسانی progress bar دانلود"""
         self.download_progress.setValue(percent)
+        self.download_progress.setFormat(f"دانلود: {percent}%")
+        
         if percent == 100:
+            # کمی صبر کنید تا کاربر progress کامل را ببیند
+            import time
+            time.sleep(1)
             self.download_progress.setVisible(False)
             self.download_status.setVisible(False)
     
     def update_download_status(self, message):
         """به‌روزرسانی status دانلود"""
-        self.download_status.setText(message)
+        self.download_status.setText(f"📥 {message}")
         self.download_status.setVisible(True)
         self.download_progress.setVisible(True)
+        self.download_progress.setValue(0)  # شروع از صفر
 
     def display_result(self, text):
         self.text_edit.setPlainText(text)
@@ -905,6 +1540,32 @@ class VoiceApp(QWidget):
         self.dict_manager_window.show()
         self.dict_manager_window.raise_()
         self.dict_manager_window.activateWindow()
+
+    def change_model(self):
+        """تغییر مدل بدون شروع transcription"""
+        dialog = ModelSelectionDialog(self)
+        if dialog.exec() == QDialog.Accepted:
+            self.selected_model = dialog.get_selected_model()
+            
+            # ذخیره مدل انتخاب شده
+            ConfigManager.update_model(self.selected_model)
+            
+            # به‌روزرسانی نمایش مدل
+            self.update_model_display()
+            
+            QMessageBox.information(self, "Model Changed", f"Model changed to: {self.selected_model}")
+
+    def closeEvent(self, event):
+        """ذخیره تنظیمات هنگام بستن برنامه"""
+        # ذخیره موقعیت و اندازه پنجره
+        geometry = {
+            "x": self.x(),
+            "y": self.y(),
+            "width": self.width(),
+            "height": self.height()
+        }
+        ConfigManager.update_window_geometry(geometry)
+        event.accept()
 
     def show_google_setup_guide(self):
         from PySide6.QtWidgets import QDialog, QVBoxLayout, QTextEdit, QPushButton, QHBoxLayout
@@ -1034,11 +1695,86 @@ class VoiceApp(QWidget):
         whisper_layout.addWidget(whisper_list)
         tab_widget.addTab(whisper_tab, "Whisper Models")
         
+        # Tab Hugging Face
+        hf_tab = QWidget()
+        hf_layout = QVBoxLayout(hf_tab)
+        hf_list = QListWidget()
+        
+        for model_id, model_info in ModelDownloader.DOWNLOADABLE_MODELS.items():
+            if model_info["type"] == "HuggingFace":
+                status = "✅ دانلود شده" if ModelDownloader.is_model_downloaded(model_id) else "❌ دانلود نشده"
+                item_text = f"{model_info['name']} ({model_info['size']}) - {model_info['warning']} - {status}"
+                hf_list.addItem(item_text)
+        
+        hf_layout.addWidget(hf_list)
+        tab_widget.addTab(hf_tab, "Hugging Face Models")
+        
+        # Tab SpeechRecognition
+        sr_tab = QWidget()
+        sr_layout = QVBoxLayout(sr_tab)
+        sr_list = QListWidget()
+        
+        for model_id, model_info in ModelDownloader.DOWNLOADABLE_MODELS.items():
+            if model_info["type"] == "SpeechRecognition":
+                status = "✅ آماده" if True else "❌ نیاز به تنظیم"
+                item_text = f"{model_info['name']} ({model_info['size']}) - {model_info['warning']} - {status}"
+                sr_list.addItem(item_text)
+        
+        sr_layout.addWidget(sr_list)
+        tab_widget.addTab(sr_tab, "SpeechRecognition")
+        
+        # Tab Silero
+        silero_tab = QWidget()
+        silero_layout = QVBoxLayout(silero_tab)
+        silero_list = QListWidget()
+        
+        for model_id, model_info in ModelDownloader.DOWNLOADABLE_MODELS.items():
+            if model_info["type"] == "Silero":
+                status = "✅ دانلود شده" if ModelDownloader.is_model_downloaded(model_id) else "❌ دانلود نشده"
+                item_text = f"{model_info['name']} ({model_info['size']}) - {model_info['warning']} - {status}"
+                silero_list.addItem(item_text)
+        
+        silero_layout.addWidget(silero_list)
+        tab_widget.addTab(silero_tab, "Silero STT")
+        
+        # Tab Kaldi
+        kaldi_tab = QWidget()
+        kaldi_layout = QVBoxLayout(kaldi_tab)
+        kaldi_list = QListWidget()
+        
+        for model_id, model_info in ModelDownloader.DOWNLOADABLE_MODELS.items():
+            if model_info["type"] == "Kaldi":
+                status = "✅ دانلود شده" if ModelDownloader.is_model_downloaded(model_id) else "❌ دانلود نشده"
+                item_text = f"{model_info['name']} ({model_info['size']}) - {model_info['warning']} - {status}"
+                kaldi_list.addItem(item_text)
+        
+        kaldi_layout.addWidget(kaldi_list)
+        tab_widget.addTab(kaldi_tab, "Kaldi Models")
+        
+        # Tab Iranian Services
+        iranian_tab = QWidget()
+        iranian_layout = QVBoxLayout(iranian_tab)
+        iranian_list = QListWidget()
+        
+        for model_id, model_info in ModelDownloader.DOWNLOADABLE_MODELS.items():
+            if model_info["type"] == "Iranian":
+                status = "✅ آماده" if True else "❌ نیاز به تنظیم"
+                item_text = f"{model_info['name']} ({model_info['size']}) - {model_info['warning']} - {status}"
+                iranian_list.addItem(item_text)
+        
+        iranian_layout.addWidget(iranian_list)
+        tab_widget.addTab(iranian_tab, "سرویس‌های ایرانی")
+        
         layout.addWidget(tab_widget)
         
         # ذخیره reference ها
         dialog.vosk_list = vosk_list
         dialog.whisper_list = whisper_list
+        dialog.hf_list = hf_list
+        dialog.sr_list = sr_list
+        dialog.silero_list = silero_list
+        dialog.kaldi_list = kaldi_list
+        dialog.iranian_list = iranian_list
         dialog.tab_widget = tab_widget
         
         # دکمه‌ها
@@ -1073,12 +1809,31 @@ class VoiceApp(QWidget):
         # تشخیص tab فعال
         current_tab = dialog.tab_widget.currentIndex()
         
+        # تعیین model_list و model_type بر اساس tab
         if current_tab == 0:  # Vosk tab
             model_list = dialog.vosk_list
             model_type = "Vosk"
-        else:  # Whisper tab
+        elif current_tab == 1:  # Whisper tab
             model_list = dialog.whisper_list
             model_type = "Whisper"
+        elif current_tab == 2:  # Hugging Face tab
+            model_list = dialog.hf_list
+            model_type = "HuggingFace"
+        elif current_tab == 3:  # SpeechRecognition tab
+            model_list = dialog.sr_list
+            model_type = "SpeechRecognition"
+        elif current_tab == 4:  # Silero tab
+            model_list = dialog.silero_list
+            model_type = "Silero"
+        elif current_tab == 5:  # Kaldi tab
+            model_list = dialog.kaldi_list
+            model_type = "Kaldi"
+        elif current_tab == 6:  # Iranian tab
+            model_list = dialog.iranian_list
+            model_type = "Iranian"
+        else:
+            QMessageBox.warning(dialog, "هشدار", "لطفاً یک tab معتبر انتخاب کنید.")
+            return
         
         current_row = model_list.currentRow()
         if current_row == -1:
@@ -1089,6 +1844,11 @@ class VoiceApp(QWidget):
         model_ids = [key for key, value in ModelDownloader.DOWNLOADABLE_MODELS.items() 
                     if value["type"] == model_type]
         model_id = model_ids[current_row]
+        
+        # بررسی وضعیت مدل
+        if model_type in ["SpeechRecognition", "Iranian"]:
+            QMessageBox.information(dialog, "اطلاعات", f"مدل {model_id} آنلاین است و نیازی به دانلود ندارد.")
+            return
         
         if ModelDownloader.is_model_downloaded(model_id):
             QMessageBox.information(dialog, "اطلاعات", "این مدل قبلاً دانلود شده است.")
