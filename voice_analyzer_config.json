@@ -1,11 +1,11 @@
 {
-  "selected_model": "silero_stt_multilingual",
-  "last_audio_path": "C:/Users/Reza/Desktop/_ALI/02.ogg",
+  "selected_model": "whisper_large_v3",
+  "last_audio_path": "C:/Users/Reza/Desktop/_ALI/nadimi.mp3",
   "window_geometry": {
-    "x": 510,
-    "y": -1,
-    "width": 900,
-    "height": 732
+    "x": 326,
+    "y": 26,
+    "width": 1062,
+    "height": 866
   },
   "preferred_language": "fa"
 }

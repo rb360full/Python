@@ -1026,6 +1026,7 @@ class TranscribeThread(QThread):
         self.model = None
         self._pause = False
         self._stop = False
+        self.silero_models = {}  # Cache برای مدل‌های Silero
 
     def run(self):
         try:
@@ -1039,49 +1040,138 @@ class TranscribeThread(QThread):
                     whisper_model = "large-v2"
                 elif whisper_model == "large_v3":
                     whisper_model = "large-v3"
+                
+                # نمایش پیام بارگذاری
+                if hasattr(self, 'download_status'):
+                    self.download_status.emit(f"در حال بارگذاری مدل Whisper {whisper_model}...")
+                
                 self.model = whisper.load_model(whisper_model)
+                
+                # پنهان کردن پیام بارگذاری
+                if hasattr(self, 'download_status'):
+                    self.download_status.emit(f"مدل Whisper {whisper_model} بارگذاری شد")
             elif self.model_name.startswith("google_"):
                 if not GOOGLE_SPEECH_AVAILABLE:
                     self.finished.emit("Error: Google Speech-to-Text not installed. Install with: pip install google-cloud-speech")
                     return
+                
+                # نمایش پیام بارگذاری
+                if hasattr(self, 'download_status'):
+                    self.download_status.emit(f"در حال اتصال به Google Speech {self.model_name}...")
+                
                 self.model = "google"  # نشانگر استفاده از Google
+                
+                # پنهان کردن پیام بارگذاری
+                if hasattr(self, 'download_status'):
+                    self.download_status.emit(f"Google Speech {self.model_name} آماده")
             elif self.model_name.startswith("vosk_"):
                 if not VOSK_AVAILABLE:
                     self.finished.emit("Error: Vosk not installed. Install with: pip install vosk")
                     return
+                
+                # نمایش پیام بارگذاری
+                if hasattr(self, 'download_status'):
+                    self.download_status.emit(f"در حال بارگذاری مدل Vosk {self.model_name}...")
+                
                 self.model = "vosk"  # نشانگر استفاده از Vosk
+                
+                # پنهان کردن پیام بارگذاری
+                if hasattr(self, 'download_status'):
+                    self.download_status.emit(f"مدل Vosk {self.model_name} آماده")
             elif self.model_name.startswith("azure_"):
                 if not AZURE_SPEECH_AVAILABLE:
                     self.finished.emit("Error: Azure Speech not installed. Install with: pip install azure-cognitiveservices-speech")
                     return
+                
+                # نمایش پیام بارگذاری
+                if hasattr(self, 'download_status'):
+                    self.download_status.emit(f"در حال اتصال به Azure Speech {self.model_name}...")
+                
                 self.model = "azure"  # نشانگر استفاده از Azure
+                
+                # پنهان کردن پیام بارگذاری
+                if hasattr(self, 'download_status'):
+                    self.download_status.emit(f"Azure Speech {self.model_name} آماده")
             elif self.model_name.startswith("assemblyai_"):
                 if not ASSEMBLYAI_AVAILABLE:
                     self.finished.emit("Error: AssemblyAI not installed. Install with: pip install assemblyai")
                     return
+                
+                # نمایش پیام بارگذاری
+                if hasattr(self, 'download_status'):
+                    self.download_status.emit(f"در حال اتصال به AssemblyAI {self.model_name}...")
+                
                 self.model = "assemblyai"  # نشانگر استفاده از AssemblyAI
+                
+                # پنهان کردن پیام بارگذاری
+                if hasattr(self, 'download_status'):
+                    self.download_status.emit(f"AssemblyAI {self.model_name} آماده")
             elif self.model_name.startswith("hf_"):
                 if not HUGGINGFACE_AVAILABLE:
                     self.finished.emit("Error: Hugging Face Transformers not installed. Install with: pip install transformers torch")
                     return
+                
+                # نمایش پیام بارگذاری
+                if hasattr(self, 'download_status'):
+                    self.download_status.emit(f"در حال بارگذاری مدل Hugging Face {self.model_name}...")
+                
                 self.model = "huggingface"  # نشانگر استفاده از Hugging Face
+                
+                # پنهان کردن پیام بارگذاری
+                if hasattr(self, 'download_status'):
+                    self.download_status.emit(f"مدل Hugging Face {self.model_name} آماده")
             elif self.model_name.startswith("speechrecognition_"):
                 if not SPEECHRECOGNITION_AVAILABLE:
                     self.finished.emit("Error: SpeechRecognition not installed. Install with: pip install SpeechRecognition")
                     return
+                
+                # نمایش پیام بارگذاری
+                if hasattr(self, 'download_status'):
+                    self.download_status.emit(f"در حال بارگذاری مدل SpeechRecognition {self.model_name}...")
+                
                 self.model = "speechrecognition"  # نشانگر استفاده از SpeechRecognition
+                
+                # پنهان کردن پیام بارگذاری
+                if hasattr(self, 'download_status'):
+                    self.download_status.emit(f"مدل SpeechRecognition {self.model_name} آماده")
             elif self.model_name.startswith("silero_"):
                 if not SILERO_AVAILABLE:
                     self.finished.emit("Error: Silero STT not installed. Install with: pip install torchaudio")
                     return
+                
+                # نمایش پیام بارگذاری
+                if hasattr(self, 'download_status'):
+                    self.download_status.emit(f"در حال بارگذاری مدل Silero STT {self.model_name}...")
+                
                 self.model = "silero"  # نشانگر استفاده از Silero
+                
+                # پنهان کردن پیام بارگذاری
+                if hasattr(self, 'download_status'):
+                    self.download_status.emit(f"مدل Silero STT {self.model_name} آماده")
             elif self.model_name.startswith("kaldi_"):
                 if not KALDI_AVAILABLE:
                     self.finished.emit("Error: Kaldi not installed. Install with: pip install kaldi-io")
                     return
+                
+                # نمایش پیام بارگذاری
+                if hasattr(self, 'download_status'):
+                    self.download_status.emit(f"در حال بارگذاری مدل Kaldi {self.model_name}...")
+                
                 self.model = "kaldi"  # نشانگر استفاده از Kaldi
+                
+                # پنهان کردن پیام بارگذاری
+                if hasattr(self, 'download_status'):
+                    self.download_status.emit(f"مدل Kaldi {self.model_name} آماده")
             elif self.model_name.startswith("iranian_"):
+                # نمایش پیام بارگذاری
+                if hasattr(self, 'download_status'):
+                    self.download_status.emit(f"در حال بارگذاری سرویس ایرانی {self.model_name}...")
+                
                 self.model = "iranian"  # نشانگر استفاده از سرویس‌های ایرانی
+                
+                # پنهان کردن پیام بارگذاری
+                if hasattr(self, 'download_status'):
+                    self.download_status.emit(f"سرویس ایرانی {self.model_name} آماده")
             else:
                 self.finished.emit(f"Error: Unknown model {self.model_name}")
                 return
@@ -1718,37 +1808,143 @@ set API_KEY_NAME=your_key_here
             
             import torch
             import torchaudio
+            import omegaconf
             
             # بررسی نسخه PyTorch
             torch_version = torch.__version__
             
-            # بارگذاری مدل
-            if self.model_name == "silero_stt_en":
-                model, decoder, utils = torch.hub.load(
-                    repo_or_dir='snakers4/silero-models', 
-                    model='silero_stt', 
-                    language='en',
-                    force_reload=False
-                )
-            else:  # silero_stt_multilingual
-                model, decoder, utils = torch.hub.load(
-                    repo_or_dir='snakers4/silero-models', 
-                    model='silero_stt', 
-                    language='multilingual',
-                    force_reload=False
-                )
+            # بررسی cache مدل
+            model_key = f"silero_{self.model_name}"
+            if model_key in self.silero_models:
+                model, decoder, utils = self.silero_models[model_key]
+                if hasattr(self, 'download_status'):
+                    self.download_status.emit("استفاده از مدل Silero STT موجود")
+            else:
+                # بارگذاری مدل با تنظیمات بهتر
+                try:
+                    # تنظیمات torch.hub برای حل مشکل اتصال
+                    import os
+                    os.environ['TORCH_HOME'] = str(Path.home() / '.cache' / 'torch')
+                    
+                    # تنظیم timeout برای دانلود
+                    import socket
+                    socket.setdefaulttimeout(60)
+                    
+                    # نمایش پیام دانلود
+                    if hasattr(self, 'download_status'):
+                        self.download_status.emit("در حال بارگذاری مدل Silero STT...")
+                    
+                    if self.model_name == "silero_stt_en":
+                        model, decoder, utils = torch.hub.load(
+                            repo_or_dir='snakers4/silero-models', 
+                            model='silero_stt', 
+                            language='en',
+                            force_reload=False,
+                            trust_repo=True,
+                            verbose=True  # نمایش پیشرفت دانلود
+                        )
+                    else:  # silero_stt_multilingual
+                        model, decoder, utils = torch.hub.load(
+                            repo_or_dir='snakers4/silero-models', 
+                            model='silero_stt', 
+                            language='multilingual',
+                            force_reload=False,
+                            trust_repo=True,
+                            verbose=True  # نمایش پیشرفت دانلود
+                        )
+                    
+                    # ذخیره در cache
+                    self.silero_models[model_key] = (model, decoder, utils)
+                    
+                    # پنهان کردن پیام دانلود
+                    if hasattr(self, 'download_status'):
+                        self.download_status.emit("مدل Silero STT بارگذاری شد")
+                
+                except Exception as model_error:
+                    error_msg = str(model_error)
+                    
+                    # اگر خطا خالی است، پیام پیش‌فرض نمایش دهید
+                    if not error_msg or error_msg.strip() == "":
+                        error_msg = "خطای نامشخص در بارگذاری مدل"
+                    
+                    # تشخیص نوع خطا
+                    if "SSL" in error_msg or "certificate" in error_msg.lower():
+                        return f"""Silero STT Error: مشکل SSL Certificate
+
+مشکل: {error_msg}
+
+راه‌حل‌ها:
+1. اتصال اینترنت خود را بررسی کنید
+2. VPN را خاموش کنید (اگر استفاده می‌کنید)
+3. فایروال را بررسی کنید
+4. از مدل‌های دیگر استفاده کنید:
+   • Vosk Persian (بهترین برای فارسی)
+   • Whisper Medium/Large (چند زبانه)
+   • Google Speech (آنلاین)
+"""
+                    elif "timeout" in error_msg.lower() or "connection" in error_msg.lower():
+                        return f"""Silero STT Error: مشکل اتصال
+
+مشکل: {error_msg}
+
+راه‌حل‌ها:
+1. اتصال اینترنت خود را بررسی کنید
+2. مدل را دوباره دانلود کنید:
+   - پوشه ~/.cache/torch/hub را حذف کنید
+   - برنامه را دوباره اجرا کنید
+3. از مدل‌های دیگر استفاده کنید:
+   • Vosk Persian (بهترین برای فارسی)
+   • Whisper Medium/Large (چند زبانه)
+   • Google Speech (آنلاین)
+"""
+                    else:
+                        return f"""Silero STT Error: مدل بارگذاری نشد
+
+مشکل: {error_msg}
+
+راه‌حل‌ها:
+1. اتصال اینترنت خود را بررسی کنید
+2. مدل را دوباره دانلود کنید:
+   - پوشه ~/.cache/torch/hub را حذف کنید
+   - برنامه را دوباره اجرا کنید
+3. از مدل‌های دیگر استفاده کنید:
+   • Vosk Persian (بهترین برای فارسی)
+   • Whisper Medium/Large (چند زبانه)
+   • Google Speech (آنلاین)
+"""
             
             # بارگذاری فایل صوتی
-            audio, sample_rate = torchaudio.load(audio_file)
-            
-            # تبدیل به mono
-            if audio.shape[0] > 1:
-                audio = torch.mean(audio, dim=0, keepdim=True)
-            
-            # تشخیص
-            text = decoder(model(audio[0]))
-            
-            return text.strip()
+            try:
+                audio, sample_rate = torchaudio.load(audio_file)
+                
+                # تبدیل به mono
+                if audio.shape[0] > 1:
+                    audio = torch.mean(audio, dim=0, keepdim=True)
+                
+                # تبدیل sample rate به 16000 اگر لازم باشد
+                if sample_rate != 16000:
+                    resampler = torchaudio.transforms.Resample(sample_rate, 16000)
+                    audio = resampler(audio)
+                
+                # تشخیص
+                with torch.no_grad():
+                    text = decoder(model(audio[0]))
+                
+                return text.strip()
+                
+            except Exception as audio_error:
+                return f"""Silero STT Error: پردازش فایل صوتی
+
+مشکل: {str(audio_error)}
+
+راه‌حل‌ها:
+1. فایل صوتی را بررسی کنید
+2. از فرمت‌های پشتیبانی شده استفاده کنید (WAV, MP3, M4A)
+3. از مدل‌های دیگر استفاده کنید:
+   • Vosk Persian (بهترین برای فارسی)
+   • Whisper Medium/Large (چند زبانه)
+   • Google Speech (آنلاین)
+"""
             
         except Exception as e:
             error_msg = str(e)
@@ -1795,7 +1991,18 @@ set API_KEY_NAME=your_key_here
 سپس برنامه را دوباره اجرا کنید.
 """
             else:
-                return f"Silero STT Error: {error_msg}\n\nلطفاً از مدل‌های دیگر استفاده کنید:\n• Vosk Persian (بهترین برای فارسی)\n• Whisper Medium/Large (چند زبانه)\n• Google Speech (آنلاین)"
+                return f"""Silero STT Error: {error_msg}
+
+راه‌حل‌ها:
+1. اتصال اینترنت خود را بررسی کنید
+2. وابستگی‌ها را دوباره نصب کنید:
+   pip install omegaconf
+   pip install torch torchaudio --index-url https://download.pytorch.org/whl/cpu
+3. از مدل‌های دیگر استفاده کنید:
+   • Vosk Persian (بهترین برای فارسی)
+   • Whisper Medium/Large (چند زبانه)
+   • Google Speech (آنلاین)
+"""
     
     def transcribe_with_kaldi(self, audio_file):
         """تبدیل صوت به متن با Kaldi"""
@@ -1970,6 +2177,18 @@ class VoiceApp(QWidget):
         self.btn_install_pytorch.setStyleSheet("background-color: #9C27B0; color: white;")
         self.btn_install_pytorch.clicked.connect(self.show_pytorch_install_guide)
         self.layout.addWidget(self.btn_install_pytorch)
+
+        self.btn_test_silero = QPushButton("تست Silero STT")
+        self.btn_test_silero.setMinimumHeight(40)
+        self.btn_test_silero.setStyleSheet("background-color: #FF5722; color: white;")
+        self.btn_test_silero.clicked.connect(self.test_silero_stt)
+        self.layout.addWidget(self.btn_test_silero)
+
+        self.btn_clear_silero_cache = QPushButton("پاک کردن Cache Silero")
+        self.btn_clear_silero_cache.setMinimumHeight(40)
+        self.btn_clear_silero_cache.setStyleSheet("background-color: #795548; color: white;")
+        self.btn_clear_silero_cache.clicked.connect(self.clear_silero_cache)
+        self.layout.addWidget(self.btn_clear_silero_cache)
 
         self.progress = QProgressBar()
         self.layout.addWidget(self.progress)
@@ -2794,6 +3013,168 @@ class VoiceApp(QWidget):
         clipboard = QApplication.clipboard()
         clipboard.setText(text)
         QMessageBox.information(self, "کپی شد", f"دستور کپی شد:\n{text}")
+    
+    def test_silero_stt(self):
+        """تست Silero STT"""
+        from PySide6.QtWidgets import QDialog, QVBoxLayout, QTextEdit, QPushButton, QHBoxLayout, QLabel
+        from PySide6.QtCore import Qt
+        
+        dialog = QDialog(self)
+        dialog.setWindowTitle("تست Silero STT")
+        dialog.setModal(True)
+        dialog.resize(600, 400)
+        
+        layout = QVBoxLayout(dialog)
+        
+        # متن راهنما
+        info_label = QLabel("تست وابستگی‌های Silero STT")
+        info_label.setStyleSheet("font-weight: bold; font-size: 16px; color: #1976D2; padding: 10px;")
+        layout.addWidget(info_label)
+        
+        # نتایج تست
+        results_text = QTextEdit()
+        results_text.setReadOnly(True)
+        results_text.setMaximumHeight(200)
+        layout.addWidget(results_text)
+        
+        def run_test():
+            results = []
+            
+            # تست omegaconf
+            try:
+                import omegaconf
+                results.append("✅ omegaconf: نصب شده")
+            except ImportError:
+                results.append("❌ omegaconf: نصب نشده")
+            
+            # تست torch
+            try:
+                import torch
+                results.append(f"✅ torch: نصب شده (نسخه {torch.__version__})")
+            except ImportError:
+                results.append("❌ torch: نصب نشده")
+            
+            # تست torchaudio
+            try:
+                import torchaudio
+                results.append(f"✅ torchaudio: نصب شده (نسخه {torchaudio.__version__})")
+            except ImportError:
+                results.append("❌ torchaudio: نصب نشده")
+            
+            # تست cache
+            cache_path = Path.home() / '.cache' / 'torch' / 'hub'
+            if cache_path.exists():
+                results.append(f"✅ Cache موجود: {cache_path}")
+                # لیست فایل‌های cache
+                try:
+                    cache_files = list(cache_path.rglob("*"))
+                    results.append(f"📁 تعداد فایل‌های cache: {len(cache_files)}")
+                except:
+                    results.append("⚠️ خطا در خواندن cache")
+            else:
+                results.append(f"❌ Cache موجود نیست: {cache_path}")
+            
+            # تست بارگذاری مدل
+            try:
+                import torch
+                import omegaconf
+                
+                results.append("\n🔄 تست بارگذاری مدل...")
+                
+                # تنظیمات برای حل مشکل اتصال
+                import os
+                os.environ['TORCH_HOME'] = str(Path.home() / '.cache' / 'torch')
+                import socket
+                socket.setdefaulttimeout(30)
+                
+                # تست مدل انگلیسی
+                try:
+                    model, decoder, utils = torch.hub.load(
+                        repo_or_dir='snakers4/silero-models', 
+                        model='silero_stt', 
+                        language='en',
+                        force_reload=False,
+                        trust_repo=True,
+                        verbose=False
+                    )
+                    results.append("✅ مدل انگلیسی: بارگذاری موفق")
+                except Exception as e:
+                    results.append(f"❌ مدل انگلیسی: خطا - {str(e)}")
+                
+                # تست مدل چند زبانه
+                try:
+                    model, decoder, utils = torch.hub.load(
+                        repo_or_dir='snakers4/silero-models', 
+                        model='silero_stt', 
+                        language='multilingual',
+                        force_reload=False,
+                        trust_repo=True,
+                        verbose=False
+                    )
+                    results.append("✅ مدل چند زبانه: بارگذاری موفق")
+                except Exception as e:
+                    results.append(f"❌ مدل چند زبانه: خطا - {str(e)}")
+                
+            except Exception as e:
+                results.append(f"❌ خطا در تست مدل: {str(e)}")
+            
+            # نمایش نتایج
+            results_text.setPlainText("\n".join(results))
+        
+        # دکمه تست
+        test_btn = QPushButton("اجرای تست")
+        test_btn.setStyleSheet("background-color: #4CAF50; color: white; padding: 8px;")
+        test_btn.clicked.connect(run_test)
+        layout.addWidget(test_btn)
+        
+        # دکمه بستن
+        close_btn = QPushButton("بستن")
+        close_btn.clicked.connect(dialog.accept)
+        layout.addWidget(close_btn)
+        
+        # اجرای خودکار تست
+        run_test()
+        
+        dialog.exec()
+    
+    def clear_silero_cache(self):
+        """پاک کردن cache Silero STT"""
+        from PySide6.QtWidgets import QMessageBox
+        import shutil
+        
+        try:
+            # مسیر cache
+            cache_path = Path.home() / '.cache' / 'torch' / 'hub'
+            
+            if cache_path.exists():
+                # تأیید از کاربر
+                reply = QMessageBox.question(
+                    self, "تأیید پاک کردن Cache", 
+                    f"آیا می‌خواهید cache Silero STT را پاک کنید؟\n\nمسیر: {cache_path}\n\nاین کار مدل‌های دانلود شده را حذف می‌کند.",
+                    QMessageBox.Yes | QMessageBox.No,
+                    QMessageBox.No
+                )
+                
+                if reply == QMessageBox.Yes:
+                    # پاک کردن cache
+                    shutil.rmtree(cache_path)
+                    QMessageBox.information(
+                        self, "موفق", 
+                        "Cache Silero STT با موفقیت پاک شد!\n\nحالا می‌توانید Silero STT را دوباره تست کنید."
+                    )
+                else:
+                    QMessageBox.information(self, "لغو شد", "عملیات لغو شد.")
+            else:
+                QMessageBox.information(
+                    self, "اطلاعات", 
+                    "Cache Silero STT یافت نشد.\n\nمسیر: " + str(cache_path)
+                )
+                
+        except Exception as e:
+            QMessageBox.critical(
+                self, "خطا", 
+                f"خطا در پاک کردن cache:\n{str(e)}\n\nلطفاً دستی پاک کنید:\n{Path.home() / '.cache' / 'torch' / 'hub'}"
+            )
     
     def download_selected_model(self, dialog):
         """دانلود مدل انتخاب شده"""
