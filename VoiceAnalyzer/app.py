@@ -272,19 +272,27 @@ class ModelDownloader:
         
         # Hugging Face Transformers
         "hf_wav2vec2_persian": {
-            "url": "huggingface://m3hrdadfi/wav2vec2-large-xlsr-53-persian",
-            "name": "wav2vec2-large-xlsr-53-persian",
+            "url": "huggingface://m3hrdadfi/wav2vec2-large-xlsr-persian",
+            "name": "wav2vec2-large-xlsr-persian",
             "size": "1.2 GB",
             "language": "فارسی",
             "warning": "✅ مخصوص فارسی - Hugging Face",
             "type": "HuggingFace"
         },
-        "hf_whisper_persian": {
-            "url": "huggingface://m3hrdadfi/whisper-persian",
-            "name": "whisper-persian",
-            "size": "1.5 GB",
+        "hf_whisper_large_v3_persian": {
+            "url": "huggingface://nezamisafa/whisper-large-v3-persian",
+            "name": "whisper-large-v3-persian",
+            "size": "2.9 GB",
             "language": "فارسی",
-            "warning": "✅ مخصوص فارسی - Hugging Face",
+            "warning": "✅ مخصوص فارسی - بهترین کیفیت",
+            "type": "HuggingFace"
+        },
+        "hf_whisper_large_v3_persian_alt": {
+            "url": "huggingface://MohammadKhosravi/whisper-large-v3-Persian",
+            "name": "whisper-large-v3-Persian",
+            "size": "2.9 GB",
+            "language": "فارسی",
+            "warning": "✅ مخصوص فارسی - جایگزین",
             "type": "HuggingFace"
         },
         "hf_wav2vec2_persian_alt": {
@@ -412,49 +420,7 @@ class ModelDownloader:
             "type": "Silero"
         },
         
-        # Kaldi
-        "kaldi_persian": {
-            "url": "kaldi://persian",
-            "name": "Kaldi Persian Model",
-            "size": "500 MB",
-            "language": "فارسی",
-            "warning": "🚧 در حال توسعه - از Vosk Persian استفاده کنید",
-            "type": "Kaldi"
-        },
-        "kaldi_english": {
-            "url": "kaldi://english",
-            "name": "Kaldi English Model",
-            "size": "300 MB",
-            "language": "انگلیسی",
-            "warning": "🚧 در حال توسعه - از Vosk استفاده کنید",
-            "type": "Kaldi"
-        },
         
-        # سرویس‌های بومی ایرانی
-        "iranian_arvan": {
-            "url": "arvan://speech",
-            "name": "Arvan Cloud Speech",
-            "size": "0 MB",
-            "language": "فارسی",
-            "warning": "🇮🇷 سرویس ایرانی - آنلاین",
-            "type": "Iranian"
-        },
-        "iranian_fanap": {
-            "url": "fanap://speech",
-            "name": "Fanap Speech API",
-            "size": "0 MB",
-            "language": "فارسی",
-            "warning": "🇮🇷 سرویس ایرانی - آنلاین",
-            "type": "Iranian"
-        },
-        "iranian_parsijoo": {
-            "url": "parsijoo://speech",
-            "name": "Parsijoo Speech",
-            "size": "0 MB",
-            "language": "فارسی",
-            "warning": "🇮🇷 سرویس ایرانی - آنلاین",
-            "type": "Iranian"
-        }
     }
     
     # برای سازگاری با کد قبلی
@@ -796,7 +762,8 @@ class ModelSelectionDialog(QDialog):
             
             # Hugging Face Transformers (آفلاین)
             ("hf_wav2vec2_persian", "✅ Wav2Vec2 Persian - مخصوص فارسی (1.2 GB)", "persian", "offline"),
-            ("hf_whisper_persian", "✅ Whisper Persian - مخصوص فارسی (1.5 GB)", "persian", "offline"),
+            ("hf_whisper_large_v3_persian", "✅ Whisper Large V3 Persian - بهترین کیفیت (2.9 GB)", "persian", "offline"),
+            ("hf_whisper_large_v3_persian_alt", "✅ Whisper Large V3 Persian Alt - جایگزین (2.9 GB)", "persian", "offline"),
             ("hf_wav2vec2_persian_alt", "⚠️ Wav2Vec2 Multilingual - چند زبانه (1.2 GB)", "both", "offline"),
             ("hf_whisper_tiny", "⚠️ Whisper Tiny HF - ضعیف برای فارسی (75 MB)", "both", "offline"),
             ("hf_whisper_base", "⚠️ Whisper Base HF - ضعیف برای فارسی (142 MB)", "both", "offline"),
@@ -817,29 +784,8 @@ class ModelSelectionDialog(QDialog):
             ("silero_stt_en", "⚠️ Silero STT English - فقط انگلیسی (50 MB)", "english", "offline"),
             ("silero_stt_multilingual", "✅ Silero STT Multilingual - پشتیبانی از فارسی (200 MB)", "both", "offline"),
             
-            # Kaldi (آفلاین)
-            ("kaldi_persian", "🚧 Kaldi Persian - در حال توسعه (500 MB)", "persian", "offline"),
-            ("kaldi_english", "🚧 Kaldi English - در حال توسعه (300 MB)", "english", "offline"),
             
-            # سرویس‌های بومی ایرانی (آنلاین)
-            ("iranian_arvan", "🇮🇷 Arvan Cloud Speech - سرویس ایرانی (آنلاین)", "persian", "online"),
-            ("iranian_fanap", "🇮🇷 Fanap Speech API - سرویس ایرانی (آنلاین)", "persian", "online"),
-            ("iranian_parsijoo", "🇮🇷 Parsijoo Speech - سرویس ایرانی (آنلاین)", "persian", "online"),
             
-            # Google Models (آنلاین)
-            ("google_standard", "🌐 Google Standard - رایگان 60دقیقه/ماه (آنلاین)", "both", "online"),
-            ("google_enhanced", "💳 Google Enhanced - پولی، دقت بالاتر (آنلاین)", "both", "online"),
-            ("google_phone_call", "💳 Google Phone Call - پولی، مخصوص تماس‌ها (آنلاین)", "both", "online"),
-            ("google_medical", "💳 Google Medical - پولی، اصطلاحات پزشکی (آنلاین)", "both", "online"),
-            ("google_video", "💳 Google Video - پولی، مخصوص ویدیوها (آنلاین)", "both", "online"),
-            
-            # Microsoft Azure Speech (آنلاین)
-            ("azure_standard", "🌐 Azure Standard - رایگان 5ساعت/ماه (آنلاین)", "both", "online"),
-            ("azure_enhanced", "💳 Azure Enhanced - پولی، دقت بالاتر (آنلاین)", "both", "online"),
-            
-            # AssemblyAI (آنلاین)
-            ("assemblyai_standard", "🌐 AssemblyAI - رایگان 3ساعت/ماه (آنلاین)", "both", "online"),
-            ("assemblyai_enhanced", "💳 AssemblyAI Enhanced - پولی، دقت بالاتر (آنلاین)", "both", "online")
         ]
         
         # بارگذاری مدل‌ها در لیست
@@ -1266,7 +1212,7 @@ class TranscribeThread(QThread):
                                    "vosk_chinese", "vosk_japanese", "vosk_korean"]:
                 rec = vosk.KaldiRecognizer(model, 16000)
             else:
-            rec = vosk.KaldiRecognizer(model, 16000)
+                rec = vosk.KaldiRecognizer(model, 16000)
             
             # خواندن فایل صوتی
             with open(audio_file, "rb") as f:
@@ -1388,7 +1334,7 @@ class TranscribeThread(QThread):
             if self.model_name == "hf_wav2vec2_persian":
                 # تلاش برای بارگذاری مدل فارسی
                 try:
-                    model_name = "m3hrdadfi/wav2vec2-large-xlsr-53-persian"
+                    model_name = "m3hrdadfi/wav2vec2-large-xlsr-persian"
                     processor = AutoProcessor.from_pretrained(model_name)
                     model = AutoModelForCTC.from_pretrained(model_name)
                 except Exception as e:
@@ -1397,7 +1343,7 @@ class TranscribeThread(QThread):
                     if "not a valid model identifier" in error_msg:
                         return f"""Hugging Face Error: مدل فارسی در دسترس نیست
 
-مشکل: مدل m3hrdadfi/wav2vec2-large-xlsr-53-persian یافت نشد
+مشکل: مدل m3hrdadfi/wav2vec2-large-xlsr-persian یافت نشد
 
 راه‌حل‌ها:
 1. اتصال اینترنت خود را بررسی کنید
@@ -1415,10 +1361,10 @@ class TranscribeThread(QThread):
                     else:
                         return f"Hugging Face Error: {error_msg}. لطفاً از Vosk Persian یا Whisper استفاده کنید."
                     
-            elif self.model_name == "hf_whisper_persian":
+            elif self.model_name == "hf_whisper_large_v3_persian":
                 # تلاش برای بارگذاری مدل Whisper فارسی
                 try:
-                    model_name = "m3hrdadfi/whisper-persian"
+                    model_name = "nezamisafa/whisper-large-v3-persian"
                     processor = AutoProcessor.from_pretrained(model_name)
                     model = AutoModelForCTC.from_pretrained(model_name)
                 except Exception as e:
@@ -1426,7 +1372,35 @@ class TranscribeThread(QThread):
                     if "not a valid model identifier" in error_msg:
                         return f"""Hugging Face Error: مدل Whisper فارسی در دسترس نیست
 
-مشکل: مدل m3hrdadfi/whisper-persian یافت نشد
+مشکل: مدل nezamisafa/whisper-large-v3-persian یافت نشد
+
+راه‌حل‌ها:
+1. از مدل‌های جایگزین استفاده کنید:
+   • Whisper Medium/Large (چند زبانه)
+   • Vosk Persian (بهترین برای فارسی)
+   • Whisper عادی (Hugging Face)
+
+برای استفاده از Hugging Face:
+1. به https://huggingface.co بروید
+2. حساب کاربری بسازید
+3. از دستور زیر استفاده کنید:
+   hf auth login
+"""
+                    else:
+                        return f"Hugging Face Error: {error_msg}. لطفاً از Whisper عادی استفاده کنید."
+                        
+            elif self.model_name == "hf_whisper_large_v3_persian_alt":
+                # تلاش برای بارگذاری مدل Whisper فارسی جایگزین
+                try:
+                    model_name = "MohammadKhosravi/whisper-large-v3-Persian"
+                    processor = AutoProcessor.from_pretrained(model_name)
+                    model = AutoModelForCTC.from_pretrained(model_name)
+                except Exception as e:
+                    error_msg = str(e)
+                    if "not a valid model identifier" in error_msg:
+                        return f"""Hugging Face Error: مدل Whisper فارسی در دسترس نیست
+
+مشکل: مدل MohammadKhosravi/whisper-large-v3-Persian یافت نشد
 
 راه‌حل‌ها:
 1. از مدل‌های جایگزین استفاده کنید:
@@ -2243,33 +2217,6 @@ class VoiceApp(QWidget):
         silero_layout.addWidget(silero_list)
         tab_widget.addTab(silero_tab, "Silero STT")
         
-        # Tab Kaldi
-        kaldi_tab = QWidget()
-        kaldi_layout = QVBoxLayout(kaldi_tab)
-        kaldi_list = QListWidget()
-        
-        for model_id, model_info in ModelDownloader.DOWNLOADABLE_MODELS.items():
-            if model_info["type"] == "Kaldi":
-                status = "✅ دانلود شده" if ModelDownloader.is_model_downloaded(model_id) else "❌ دانلود نشده"
-                item_text = f"{model_info['name']} ({model_info['size']}) - {model_info['warning']} - {status}"
-                kaldi_list.addItem(item_text)
-        
-        kaldi_layout.addWidget(kaldi_list)
-        tab_widget.addTab(kaldi_tab, "Kaldi Models")
-        
-        # Tab Iranian Services
-        iranian_tab = QWidget()
-        iranian_layout = QVBoxLayout(iranian_tab)
-        iranian_list = QListWidget()
-        
-        for model_id, model_info in ModelDownloader.DOWNLOADABLE_MODELS.items():
-            if model_info["type"] == "Iranian":
-                status = "✅ آماده" if True else "❌ نیاز به تنظیم"
-                item_text = f"{model_info['name']} ({model_info['size']}) - {model_info['warning']} - {status}"
-                iranian_list.addItem(item_text)
-        
-        iranian_layout.addWidget(iranian_list)
-        tab_widget.addTab(iranian_tab, "سرویس‌های ایرانی")
         
         layout.addWidget(tab_widget)
         
@@ -2279,8 +2226,6 @@ class VoiceApp(QWidget):
         dialog.hf_list = hf_list
         dialog.sr_list = sr_list
         dialog.silero_list = silero_list
-        dialog.kaldi_list = kaldi_list
-        dialog.iranian_list = iranian_list
         dialog.tab_widget = tab_widget
         
         # دکمه‌ها
@@ -2516,12 +2461,6 @@ class VoiceApp(QWidget):
         elif current_tab == 4:  # Silero tab
             model_list = dialog.silero_list
             model_type = "Silero"
-        elif current_tab == 5:  # Kaldi tab
-            model_list = dialog.kaldi_list
-            model_type = "Kaldi"
-        elif current_tab == 6:  # Iranian tab
-            model_list = dialog.iranian_list
-            model_type = "Iranian"
         else:
             QMessageBox.warning(dialog, "هشدار", "لطفاً یک tab معتبر انتخاب کنید.")
             return
@@ -2537,7 +2476,7 @@ class VoiceApp(QWidget):
         model_id = model_ids[current_row]
         
         # بررسی وضعیت مدل
-        if model_type in ["SpeechRecognition", "Iranian"]:
+        if model_type in ["SpeechRecognition"]:
             QMessageBox.information(dialog, "اطلاعات", f"مدل {model_id} آنلاین است و نیازی به دانلود ندارد.")
             return
         
