@@ -602,6 +602,17 @@ class ModelSelectionDialog(QDialog):
         self.setModal(True)
         self.resize(600, 500)
         
+        # تم دارک برای کل دیالوگ
+        self.setStyleSheet("""
+            QDialog {
+                background-color: #1e1e1e;
+                color: #ffffff;
+            }
+            QLabel {
+                color: #ffffff;
+            }
+        """)
+        
         layout = QVBoxLayout(self)
         
         # فیلترهای مدل
@@ -610,30 +621,121 @@ class ModelSelectionDialog(QDialog):
         # چک باکس زبان
         self.checkbox_persian = QCheckBox("فارسی")
         self.checkbox_persian.setChecked(True)
-        self.checkbox_persian.setStyleSheet("QCheckBox { font-weight: bold; color: #2e7d32; }")
+        self.checkbox_persian.setStyleSheet("""
+            QCheckBox {
+                font-weight: bold; 
+                color: #81c784;
+                font-size: 14px;
+                padding: 5px;
+            }
+            QCheckBox::indicator {
+                width: 18px;
+                height: 18px;
+                border: 2px solid #81c784;
+                border-radius: 3px;
+                background-color: #2b2b2b;
+            }
+            QCheckBox::indicator:checked {
+                background-color: #81c784;
+                border: 2px solid #4caf50;
+            }
+            QCheckBox::indicator:hover {
+                border: 2px solid #a5d6a7;
+            }
+        """)
         self.checkbox_persian.stateChanged.connect(self.filter_models)
         
         self.checkbox_english = QCheckBox("انگلیسی")
         self.checkbox_english.setChecked(True)
-        self.checkbox_english.setStyleSheet("QCheckBox { font-weight: bold; color: #1976d2; }")
+        self.checkbox_english.setStyleSheet("""
+            QCheckBox {
+                font-weight: bold; 
+                color: #64b5f6;
+                font-size: 14px;
+                padding: 5px;
+            }
+            QCheckBox::indicator {
+                width: 18px;
+                height: 18px;
+                border: 2px solid #64b5f6;
+                border-radius: 3px;
+                background-color: #2b2b2b;
+            }
+            QCheckBox::indicator:checked {
+                background-color: #64b5f6;
+                border: 2px solid #2196f3;
+            }
+            QCheckBox::indicator:hover {
+                border: 2px solid #90caf9;
+            }
+        """)
         self.checkbox_english.stateChanged.connect(self.filter_models)
         
         # چک باکس نوع اتصال
         self.checkbox_online = QCheckBox("آنلاین")
         self.checkbox_online.setChecked(True)
-        self.checkbox_online.setStyleSheet("QCheckBox { font-weight: bold; color: #ff6b35; }")
+        self.checkbox_online.setStyleSheet("""
+            QCheckBox {
+                font-weight: bold; 
+                color: #ff8a65;
+                font-size: 14px;
+                padding: 5px;
+            }
+            QCheckBox::indicator {
+                width: 18px;
+                height: 18px;
+                border: 2px solid #ff8a65;
+                border-radius: 3px;
+                background-color: #2b2b2b;
+            }
+            QCheckBox::indicator:checked {
+                background-color: #ff8a65;
+                border: 2px solid #ff5722;
+            }
+            QCheckBox::indicator:hover {
+                border: 2px solid #ffab91;
+            }
+        """)
         self.checkbox_online.stateChanged.connect(self.filter_models)
         
         self.checkbox_offline = QCheckBox("آفلاین")
         self.checkbox_offline.setChecked(True)
-        self.checkbox_offline.setStyleSheet("QCheckBox { font-weight: bold; color: #9c27b0; }")
+        self.checkbox_offline.setStyleSheet("""
+            QCheckBox {
+                font-weight: bold; 
+                color: #9575cd;
+                font-size: 14px;
+                padding: 5px;
+            }
+            QCheckBox::indicator {
+                width: 18px;
+                height: 18px;
+                border: 2px solid #9575cd;
+                border-radius: 3px;
+                background-color: #2b2b2b;
+            }
+            QCheckBox::indicator:checked {
+                background-color: #9575cd;
+                border: 2px solid #7e57c2;
+            }
+            QCheckBox::indicator:hover {
+                border: 2px solid #b39ddb;
+            }
+        """)
         self.checkbox_offline.stateChanged.connect(self.filter_models)
         
-        filter_layout.addWidget(QLabel("زبان:"))
+        # برچسب زبان
+        lang_label = QLabel("زبان:")
+        lang_label.setStyleSheet("color: #ffffff; font-weight: bold; font-size: 14px; padding: 5px;")
+        filter_layout.addWidget(lang_label)
         filter_layout.addWidget(self.checkbox_persian)
         filter_layout.addWidget(self.checkbox_english)
         filter_layout.addStretch()
-        filter_layout.addWidget(QLabel("نوع:"))
+        
+        # برچسب نوع
+        type_label = QLabel("نوع:")
+        type_label.setStyleSheet("color: #ffffff; font-weight: bold; font-size: 14px; padding: 5px;")
+        filter_layout.addWidget(type_label)
         filter_layout.addWidget(self.checkbox_online)
         filter_layout.addWidget(self.checkbox_offline)
         
@@ -644,18 +746,34 @@ class ModelSelectionDialog(QDialog):
         self.model_list.setMinimumHeight(300)
         self.model_list.setStyleSheet("""
             QListWidget {
-                background-color: #f5f5f5;
-                border: 1px solid #ddd;
-                border-radius: 5px;
-                padding: 5px;
+                background-color: #2b2b2b;
+                border: 2px solid #444;
+                border-radius: 8px;
+                padding: 8px;
+                color: #ffffff;
+                font-size: 13px;
+                font-family: 'Segoe UI', Arial, sans-serif;
             }
             QListWidget::item {
-                padding: 8px;
-                border-bottom: 1px solid #eee;
+                padding: 12px 8px;
+                border-bottom: 1px solid #444;
+                border-radius: 4px;
+                margin: 2px 0px;
+                color: #ffffff;
+                background-color: #3a3a3a;
+            }
+            QListWidget::item:hover {
+                background-color: #4a4a4a;
+                border: 1px solid #666;
             }
             QListWidget::item:selected {
-                background-color: #e3f2fd;
-                color: #1976d2;
+                background-color: #1976d2;
+                color: #ffffff;
+                border: 2px solid #42a5f5;
+                font-weight: bold;
+            }
+            QListWidget::item:selected:hover {
+                background-color: #1565c0;
             }
         """)
         layout.addWidget(self.model_list)
@@ -741,11 +859,43 @@ class ModelSelectionDialog(QDialog):
         # دکمه‌ها
         button_layout = QHBoxLayout()
         self.ok_button = QPushButton("تأیید")
-        self.ok_button.setStyleSheet("background-color: #4CAF50; color: white; padding: 8px 16px;")
+        self.ok_button.setStyleSheet("""
+            QPushButton {
+                background-color: #4CAF50;
+                color: white;
+                padding: 12px 24px;
+                border: none;
+                border-radius: 6px;
+                font-weight: bold;
+                font-size: 14px;
+            }
+            QPushButton:hover {
+                background-color: #45a049;
+            }
+            QPushButton:pressed {
+                background-color: #3d8b40;
+            }
+        """)
         self.ok_button.clicked.connect(self.accept)
         
         self.cancel_button = QPushButton("لغو")
-        self.cancel_button.setStyleSheet("background-color: #f44336; color: white; padding: 8px 16px;")
+        self.cancel_button.setStyleSheet("""
+            QPushButton {
+                background-color: #f44336;
+                color: white;
+                padding: 12px 24px;
+                border: none;
+                border-radius: 6px;
+                font-weight: bold;
+                font-size: 14px;
+            }
+            QPushButton:hover {
+                background-color: #da190b;
+            }
+            QPushButton:pressed {
+                background-color: #c1170a;
+            }
+        """)
         self.cancel_button.clicked.connect(self.reject)
         
         button_layout.addWidget(self.ok_button)
@@ -778,11 +928,26 @@ class ModelSelectionDialog(QDialog):
                 item = QListWidgetItem(f"{model_id} - {description}")
                 item.setData(Qt.UserRole, model_id)
                 
-                # رنگ‌بندی بر اساس نوع
+                # رنگ‌بندی بر اساس نوع اتصال
                 if connection_type == "online":
-                    item.setBackground(QColor("#fff3e0"))  # نارنجی روشن
+                    # آنلاین - نارنجی/قرمز تیره
+                    item.setBackground(QColor("#4a2c2a"))  # قرمز تیره
+                    item.setForeground(QColor("#ff8a65"))  # نارنجی روشن
                 else:
-                    item.setBackground(QColor("#f3e5f5"))  # بنفش روشن
+                    # آفلاین - بنفش/آبی تیره
+                    item.setBackground(QColor("#2a2c4a"))  # بنفش تیره
+                    item.setForeground(QColor("#9575cd"))  # بنفش روشن
+                
+                # رنگ‌بندی بر اساس زبان
+                if language == "persian":
+                    # فارسی - سبز
+                    item.setForeground(QColor("#81c784"))  # سبز روشن
+                elif language == "english":
+                    # انگلیسی - آبی
+                    item.setForeground(QColor("#64b5f6"))  # آبی روشن
+                elif language == "both":
+                    # چند زبانه - زرد
+                    item.setForeground(QColor("#ffd54f"))  # زرد روشن
                 
                 self.model_list.addItem(item)
     
@@ -1101,7 +1266,7 @@ class TranscribeThread(QThread):
                                    "vosk_chinese", "vosk_japanese", "vosk_korean"]:
                 rec = vosk.KaldiRecognizer(model, 16000)
             else:
-                rec = vosk.KaldiRecognizer(model, 16000)
+            rec = vosk.KaldiRecognizer(model, 16000)
             
             # خواندن فایل صوتی
             with open(audio_file, "rb") as f:
