@@ -1,11 +1,11 @@
 {
-  "selected_model": "hf_whisper_persian",
+  "selected_model": "hf_wav2vec2_persian",
   "last_audio_path": "C:/Users/Reza/Desktop/_ALI/02.ogg",
   "window_geometry": {
     "x": 510,
-    "y": 123,
+    "y": 92,
     "width": 900,
-    "height": 600
+    "height": 732
   },
   "preferred_language": "fa"
 }

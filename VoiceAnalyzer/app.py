@@ -430,8 +430,9 @@ class ModelDownloader:
     }
     
     @staticmethod
-    def download_model(model_id, progress_callback=None, progress_bar_callback=None):
-        """دانلود مدل"""
+    def download_model(model_id, progress_callback=None, progress_bar_callback=None, 
+                      speed_callback=None, eta_callback=None, size_callback=None):
+        """دانلود مدل با نمایش جزئیات پیشرفت"""
         if model_id not in ModelDownloader.DOWNLOADABLE_MODELS:
             return False, f"مدل {model_id} پشتیبانی نمی‌شود"
         
@@ -439,20 +440,27 @@ class ModelDownloader:
         
         # برای مدل‌های Whisper
         if model_info["type"] == "Whisper":
-            return ModelDownloader._download_whisper_model(model_id, model_info, progress_callback, progress_bar_callback)
+            return ModelDownloader._download_whisper_model(model_id, model_info, progress_callback, progress_bar_callback,
+                                                         speed_callback, eta_callback, size_callback)
         
         # برای مدل‌های Vosk
         elif model_info["type"] == "Vosk":
-            return ModelDownloader._download_vosk_model(model_id, model_info, progress_callback, progress_bar_callback)
+            return ModelDownloader._download_vosk_model(model_id, model_info, progress_callback, progress_bar_callback,
+                                                      speed_callback, eta_callback, size_callback)
         
         return False, f"نوع مدل {model_info['type']} پشتیبانی نمی‌شود"
     
     @staticmethod
-    def _download_whisper_model(model_id, model_info, progress_callback=None, progress_bar_callback=None):
-        """دانلود مدل Whisper"""
+    def _download_whisper_model(model_id, model_info, progress_callback=None, progress_bar_callback=None,
+                              speed_callback=None, eta_callback=None, size_callback=None):
+        """دانلود مدل Whisper با نمایش جزئیات پیشرفت"""
         try:
             if progress_callback:
                 progress_callback(f"در حال دانلود {model_info['name']} ({model_info['size']})...")
+            
+            # نمایش اطلاعات اندازه فایل
+            if size_callback:
+                size_callback(f"اندازه فایل: {model_info['size']}")
             
             # Whisper خودش مدل‌ها رو دانلود می‌کنه
             model_name = model_id.replace("whisper_", "")
@@ -462,10 +470,31 @@ class ModelDownloader:
             elif model_name == "large_v3":
                 model_name = "large-v3"
             
+            # شبیه‌سازی پیشرفت دانلود Whisper
+            start_time = time.time()
+            
+            # شروع دانلود
+            if progress_bar_callback:
+                progress_bar_callback(10)
+            
+            if speed_callback:
+                speed_callback("در حال اتصال...")
+            
+            if eta_callback:
+                eta_callback("محاسبه زمان...")
+            
+            # دانلود مدل
             model = whisper.load_model(model_name)
             
+            # تکمیل دانلود
             if progress_bar_callback:
                 progress_bar_callback(100)
+            
+            if speed_callback:
+                speed_callback("✅ دانلود کامل")
+            
+            if eta_callback:
+                eta_callback("✅ آماده")
             
             return True, f"مدل {model_name} با موفقیت دانلود شد"
             
@@ -473,8 +502,9 @@ class ModelDownloader:
             return False, f"خطا در دانلود Whisper: {str(e)}"
     
     @staticmethod
-    def _download_vosk_model(model_id, model_info, progress_callback=None, progress_bar_callback=None):
-        """دانلود مدل Vosk"""
+    def _download_vosk_model(model_id, model_info, progress_callback=None, progress_bar_callback=None, 
+                            speed_callback=None, eta_callback=None, size_callback=None):
+        """دانلود مدل Vosk با نمایش جزئیات پیشرفت"""
         models_dir = Path.home() / ".vosk" / "models"
         models_dir.mkdir(parents=True, exist_ok=True)
         
@@ -495,6 +525,13 @@ class ModelDownloader:
             # محاسبه اندازه فایل
             total_size = int(response.headers.get('content-length', 0))
             downloaded_size = 0
+            start_time = time.time()
+            last_update_time = start_time
+            
+            # نمایش اطلاعات اندازه فایل
+            if size_callback and total_size > 0:
+                size_mb = total_size / (1024 * 1024)
+                size_callback(f"اندازه فایل: {size_mb:.1f} MB")
             
             # ذخیره فایل
             zip_path = models_dir / f"{model_info['name']}.zip"
@@ -505,10 +542,37 @@ class ModelDownloader:
                         f.write(chunk)
                         downloaded_size += len(chunk)
                         
-                        # به‌روزرسانی progress bar
+                        current_time = time.time()
+                        
+                        # به‌روزرسانی progress bar و محاسبه سرعت
                         if progress_bar_callback and total_size > 0:
                             progress_percent = int((downloaded_size / total_size) * 100)
                             progress_bar_callback(progress_percent)
+                            
+                            # محاسبه سرعت دانلود (هر 0.5 ثانیه)
+                            if current_time - last_update_time >= 0.5:
+                                elapsed_time = current_time - start_time
+                                if elapsed_time > 0:
+                                    speed_bps = downloaded_size / elapsed_time
+                                    speed_mbps = speed_bps / (1024 * 1024)
+                                    
+                                    if speed_callback:
+                                        speed_callback(f"سرعت: {speed_mbps:.1f} MB/s")
+                                    
+                                    # محاسبه زمان باقی‌مانده
+                                    if speed_bps > 0:
+                                        remaining_bytes = total_size - downloaded_size
+                                        eta_seconds = remaining_bytes / speed_bps
+                                        eta_minutes = int(eta_seconds // 60)
+                                        eta_seconds = int(eta_seconds % 60)
+                                        
+                                        if eta_callback:
+                                            if eta_minutes > 0:
+                                                eta_callback(f"زمان باقی‌مانده: {eta_minutes}:{eta_seconds:02d}")
+                                            else:
+                                                eta_callback(f"زمان باقی‌مانده: {eta_seconds} ثانیه")
+                                
+                                last_update_time = current_time
             
             # استخراج فایل
             if progress_callback:
@@ -516,6 +580,12 @@ class ModelDownloader:
             
             if progress_bar_callback:
                 progress_bar_callback(100)  # دانلود کامل
+            
+            if speed_callback:
+                speed_callback("استخراج فایل...")
+            
+            if eta_callback:
+                eta_callback("تقریباً 10 ثانیه")
             
             with zipfile.ZipFile(zip_path, 'r') as zip_ref:
                 zip_ref.extractall(models_dir)
@@ -944,6 +1014,9 @@ class TranscribeThread(QThread):
     finished = Signal(str)
     download_progress = Signal(int)
     download_status = Signal(str)
+    download_speed = Signal(str)
+    download_eta = Signal(str)
+    download_size_info = Signal(str)
 
     def __init__(self, audio_path, model_name="vosk_persian"):
         super().__init__()
@@ -1181,17 +1254,29 @@ class TranscribeThread(QThread):
         try:
             # بررسی و دانلود مدل Vosk
             if not ModelDownloader.is_model_downloaded(self.model_name):
-                # دانلود مدل با progress bar
+                # دانلود مدل با progress bar و جزئیات
                 def progress_callback(message):
                     self.download_status.emit(message)
                 
                 def progress_bar_callback(percent):
                     self.download_progress.emit(percent)
                 
+                def speed_callback(speed):
+                    self.download_speed.emit(speed)
+                
+                def eta_callback(eta):
+                    self.download_eta.emit(eta)
+                
+                def size_callback(size):
+                    self.download_size_info.emit(size)
+                
                 success, result = ModelDownloader.download_model(
                     self.model_name, 
                     progress_callback=progress_callback,
-                    progress_bar_callback=progress_bar_callback
+                    progress_bar_callback=progress_bar_callback,
+                    speed_callback=speed_callback,
+                    eta_callback=eta_callback,
+                    size_callback=size_callback
                 )
                 if not success:
                     return f"Vosk Error: {result}"
@@ -1809,17 +1894,22 @@ class VoiceApp(QWidget):
         # Progress bar برای دانلود
         self.download_progress = QProgressBar()
         self.download_progress.setVisible(False)
+        self.download_progress.setMinimumHeight(25)
         self.download_progress.setStyleSheet("""
             QProgressBar {
-                border: 2px solid grey;
-                border-radius: 5px;
+                border: 2px solid #2196F3;
+                border-radius: 8px;
                 text-align: center;
                 font-weight: bold;
-                font-size: 12px;
+                font-size: 14px;
+                background-color: #f0f0f0;
+                color: #1976D2;
             }
             QProgressBar::chunk {
-                background-color: #4CAF50;
-                border-radius: 3px;
+                background: qlineargradient(x1: 0, y1: 0, x2: 1, y2: 0,
+                    stop: 0 #4CAF50, stop: 1 #45a049);
+                border-radius: 6px;
+                margin: 1px;
             }
         """)
         self.layout.addWidget(self.download_progress)
@@ -1828,16 +1918,61 @@ class VoiceApp(QWidget):
         self.download_status = QLabel("")
         self.download_status.setVisible(False)
         self.download_status.setStyleSheet("""
-            color: #2196F3; 
+            color: #1976D2; 
             font-weight: bold; 
             font-size: 14px;
-            padding: 5px;
+            padding: 8px;
             background-color: #E3F2FD;
-            border: 1px solid #2196F3;
-            border-radius: 5px;
+            border: 2px solid #2196F3;
+            border-radius: 8px;
         """)
         self.download_status.setAlignment(Qt.AlignCenter)
         self.layout.addWidget(self.download_status)
+        
+        # Speed label برای دانلود
+        self.download_speed = QLabel("")
+        self.download_speed.setVisible(False)
+        self.download_speed.setStyleSheet("""
+            color: #FF9800; 
+            font-weight: bold; 
+            font-size: 12px;
+            padding: 4px;
+            background-color: #FFF3E0;
+            border: 1px solid #FF9800;
+            border-radius: 4px;
+        """)
+        self.download_speed.setAlignment(Qt.AlignCenter)
+        self.layout.addWidget(self.download_speed)
+        
+        # ETA label برای دانلود
+        self.download_eta = QLabel("")
+        self.download_eta.setVisible(False)
+        self.download_eta.setStyleSheet("""
+            color: #9C27B0; 
+            font-weight: bold; 
+            font-size: 12px;
+            padding: 4px;
+            background-color: #F3E5F5;
+            border: 1px solid #9C27B0;
+            border-radius: 4px;
+        """)
+        self.download_eta.setAlignment(Qt.AlignCenter)
+        self.layout.addWidget(self.download_eta)
+        
+        # Size info label برای دانلود
+        self.download_size_info = QLabel("")
+        self.download_size_info.setVisible(False)
+        self.download_size_info.setStyleSheet("""
+            color: #607D8B; 
+            font-weight: bold; 
+            font-size: 12px;
+            padding: 4px;
+            background-color: #ECEFF1;
+            border: 1px solid #607D8B;
+            border-radius: 4px;
+        """)
+        self.download_size_info.setAlignment(Qt.AlignCenter)
+        self.layout.addWidget(self.download_size_info)
 
         self.scroll = QScrollArea()
         self.text_edit = QTextEdit()
@@ -1963,26 +2098,55 @@ class VoiceApp(QWidget):
         self.thread.finished.connect(self.display_result)
         self.thread.download_progress.connect(self.update_download_progress)
         self.thread.download_status.connect(self.update_download_status)
+        self.thread.download_speed.connect(self.update_download_speed)
+        self.thread.download_eta.connect(self.update_download_eta)
+        self.thread.download_size_info.connect(self.update_download_size_info)
         self.thread.start()
 
     def update_download_progress(self, percent):
         """به‌روزرسانی progress bar دانلود"""
         self.download_progress.setValue(percent)
-        self.download_progress.setFormat(f"دانلود: {percent}%")
+        self.download_progress.setFormat(f"📥 دانلود: {percent}%")
         
         if percent == 100:
             # کمی صبر کنید تا کاربر progress کامل را ببیند
             import time
-            time.sleep(1)
-            self.download_progress.setVisible(False)
-            self.download_status.setVisible(False)
+            time.sleep(2)
+            self.hide_download_ui()
     
     def update_download_status(self, message):
         """به‌روزرسانی status دانلود"""
         self.download_status.setText(f"📥 {message}")
-        self.download_status.setVisible(True)
+        self.show_download_ui()
+    
+    def update_download_speed(self, speed):
+        """به‌روزرسانی سرعت دانلود"""
+        self.download_speed.setText(f"⚡ {speed}")
+        self.download_speed.setVisible(True)
+    
+    def update_download_eta(self, eta):
+        """به‌روزرسانی زمان باقی‌مانده"""
+        self.download_eta.setText(f"⏱️ {eta}")
+        self.download_eta.setVisible(True)
+    
+    def update_download_size_info(self, size_info):
+        """به‌روزرسانی اطلاعات اندازه فایل"""
+        self.download_size_info.setText(f"📊 {size_info}")
+        self.download_size_info.setVisible(True)
+    
+    def show_download_ui(self):
+        """نمایش UI دانلود"""
         self.download_progress.setVisible(True)
-        self.download_progress.setValue(0)  # شروع از صفر
+        self.download_status.setVisible(True)
+        self.download_progress.setValue(0)
+    
+    def hide_download_ui(self):
+        """مخفی کردن UI دانلود"""
+        self.download_progress.setVisible(False)
+        self.download_status.setVisible(False)
+        self.download_speed.setVisible(False)
+        self.download_eta.setVisible(False)
+        self.download_size_info.setVisible(False)
 
     def display_result(self, text):
         self.text_edit.setPlainText(text)
