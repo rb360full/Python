@@ -1,11 +1,11 @@
 {
-  "selected_model": "whisper_large",
+  "selected_model": "silero_stt_multilingual",
   "last_audio_path": "C:/Users/Reza/Desktop/_ALI/02.ogg",
   "window_geometry": {
     "x": 348,
-    "y": -29,
+    "y": 0,
     "width": 1004,
-    "height": 723
+    "height": 735
   },
   "preferred_language": "fa"
 }

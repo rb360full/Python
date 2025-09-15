@@ -200,6 +200,7 @@ class ModelDownloader:
             import ssl
             import urllib.request
             import socket
+            import os
             
             # ایجاد SSL context بدون اعتبارسنجی
             ssl_context = ssl.create_default_context()
@@ -212,6 +213,10 @@ class ModelDownloader:
             
             # تنظیم timeout برای جلوگیری از hang
             socket.setdefaulttimeout(60)
+            
+            # تنظیم متغیرهای محیطی برای HuggingFace
+            os.environ['CURL_CA_BUNDLE'] = ''
+            os.environ['REQUESTS_CA_BUNDLE'] = ''
             
             return True
         except Exception as e:
@@ -335,22 +340,6 @@ class ModelDownloader:
             "size": "3.1 GB",
             "language": "فارسی",
             "warning": "✅ مخصوص فارسی - بهترین کیفیت",
-            "type": "HuggingFace"
-        },
-        "hf_whisper_large_v3_persian_alt": {
-            "url": "huggingface://MohammadKhosravi/whisper-large-v3-Persian",
-            "name": "Whisper-Large-V3-Persian-Alt",
-            "size": "3.1 GB",
-            "language": "فارسی",
-            "warning": "✅ مخصوص فارسی - جایگزین",
-            "type": "HuggingFace"
-        },
-        "hf_whisper_large_persian_steja": {
-            "url": "huggingface://steja/whisper-large-persian",
-            "name": "Whisper-Large-Persian-Steja",
-            "size": "3.1 GB",
-            "language": "فارسی",
-            "warning": "✅ مخصوص فارسی - Steja (WER: 26.37%)",
             "type": "HuggingFace"
         },
         "hf_wav2vec2_persian_alt": {
@@ -640,6 +629,9 @@ class ModelDownloader:
         """دانلود مدل Hugging Face با نمایش نوتیفیکیشن ساده"""
         try:
             from transformers import AutoModel, AutoTokenizer
+            import ssl
+            import urllib.request
+            import socket
             
             # استخراج نام مدل از URL
             model_url = model_info["url"]
@@ -649,21 +641,58 @@ class ModelDownloader:
             model_name = model_url.replace("huggingface://", "")
             
             if progress_callback:
-                progress_callback(f"در حال دانلود {model_info['name']} ({model_info['size']})...")
+                progress_callback("تنظیم اتصال امن...")
             
-            # دانلود tokenizer
-            tokenizer = AutoTokenizer.from_pretrained(model_name, force_download=False)
-            
-            # دانلود مدل
-            model = AutoModel.from_pretrained(model_name, force_download=False)
+            # تنظیم SSL برای حل مشکل SSL
+            ModelDownloader._setup_ssl_context()
             
             if progress_callback:
-                progress_callback(f"مدل {model_name} با موفقیت دانلود شد")
+                progress_callback(f"در حال دانلود {model_info['name']} ({model_info['size']})...")
             
-            return True, f"مدل {model_name} با موفقیت دانلود شد"
+            # تلاش برای دانلود با retry
+            max_retries = 3
+            for attempt in range(max_retries):
+                try:
+                    if progress_callback:
+                        progress_callback(f"تلاش {attempt + 1} از {max_retries}...")
+                    
+                    # دانلود tokenizer
+                    tokenizer = AutoTokenizer.from_pretrained(model_name, force_download=False)
+                    
+                    # دانلود مدل
+                    model = AutoModel.from_pretrained(model_name, force_download=False)
+                    
+                    if progress_callback:
+                        progress_callback(f"مدل {model_name} با موفقیت دانلود شد")
+                    
+                    return True, f"مدل {model_name} با موفقیت دانلود شد"
+                    
+                except Exception as e:
+                    if attempt < max_retries - 1:
+                        if progress_callback:
+                            progress_callback(f"خطا در تلاش {attempt + 1}: {str(e)[:50]}... تلاش مجدد...")
+                        import time
+                        time.sleep(2)  # صبر 2 ثانیه قبل از تلاش مجدد
+                        continue
+                    else:
+                        raise e
             
         except Exception as e:
-            return False, f"خطا در دانلود Hugging Face: {str(e)}"
+            error_msg = str(e)
+            if "SSL" in error_msg or "EOF" in error_msg or "MaxRetryError" in error_msg:
+                return False, f"""خطای اتصال SSL در دانلود HuggingFace: {error_msg}
+
+راه‌حل‌های پیشنهادی:
+1. اتصال اینترنت خود را بررسی کنید
+2. VPN را خاموش کنید
+3. فایروال را بررسی کنید
+4. از مدل‌های جایگزین استفاده کنید:
+   • Vosk Persian (بهترین برای فارسی)
+   • Whisper عادی (بدون HuggingFace)
+5. دوباره تلاش کنید
+"""
+            else:
+                return False, f"خطا در دانلود Hugging Face: {error_msg}"
     
     @staticmethod
     def is_model_downloaded(model_id):
@@ -726,47 +755,66 @@ class ModelDownloader:
         elif model_info["type"] == "HuggingFace":
             try:
                 import os
-                from transformers import AutoModel, AutoTokenizer
                 
                 # استخراج نام مدل از URL
                 model_url = model_info["url"]
                 if model_url.startswith("huggingface://"):
                     model_name = model_url.replace("huggingface://", "")
                     
-                    # تست بارگذاری مستقیم - ساده‌ترین روش
-                    try:
-                        # تست بارگذاری tokenizer
-                        AutoTokenizer.from_pretrained(model_name, local_files_only=True)
-                        # تست بارگذاری مدل
-                        AutoModel.from_pretrained(model_name, local_files_only=True)
-                        return True
-                    except:
-                        # اگر بارگذاری محلی موفق نبود، بررسی cache
-                        cache_dir = os.path.expanduser("~/.cache/huggingface/hub")
-                        
-                        if os.path.exists(cache_dir):
-                            for item in os.listdir(cache_dir):
-                                if model_name.replace("/", "--") in item:
-                                    model_cache_dir = os.path.join(cache_dir, item)
-                                    if os.path.exists(model_cache_dir):
-                                        # بررسی snapshots
-                                        snapshots_dir = os.path.join(model_cache_dir, "snapshots")
-                                        if os.path.exists(snapshots_dir):
-                                            for snapshot in os.listdir(snapshots_dir):
-                                                snapshot_path = os.path.join(snapshots_dir, snapshot)
-                                                if os.path.isdir(snapshot_path):
-                                                    # بررسی وجود فایل‌های ضروری
-                                                    required_files = ["config.json"]
-                                                    has_required = all(os.path.exists(os.path.join(snapshot_path, f)) for f in required_files)
+                    # بررسی cache به صورت مستقیم
+                    cache_dir = os.path.expanduser("~/.cache/huggingface/hub")
+                    
+                    if os.path.exists(cache_dir):
+                        # جستجو برای فولدر مدل
+                        model_cache_name = model_name.replace("/", "--")
+                        for item in os.listdir(cache_dir):
+                            if model_cache_name in item:
+                                model_cache_dir = os.path.join(cache_dir, item)
+                                if os.path.exists(model_cache_dir):
+                                    # بررسی snapshots
+                                    snapshots_dir = os.path.join(model_cache_dir, "snapshots")
+                                    if os.path.exists(snapshots_dir):
+                                        for snapshot in os.listdir(snapshots_dir):
+                                            snapshot_path = os.path.join(snapshots_dir, snapshot)
+                                            if os.path.isdir(snapshot_path):
+                                                # بررسی وجود فایل‌های ضروری
+                                                required_files = ["config.json"]
+                                                has_required = all(os.path.exists(os.path.join(snapshot_path, f)) for f in required_files)
+                                                
+                                                # بررسی وجود فایل مدل (با فرمت‌های مختلف)
+                                                model_files = [
+                                                    "pytorch_model.bin", 
+                                                    "model.safetensors", 
+                                                    "pytorch_model-00001-of-00001.bin",
+                                                    "model.bin",
+                                                    "pytorch_model-00001-of-00002.bin",
+                                                    "pytorch_model-00002-of-00002.bin"
+                                                ]
+                                                has_model = any(os.path.exists(os.path.join(snapshot_path, f)) for f in model_files)
+                                                
+                                                # بررسی وجود فایل‌های tokenizer
+                                                tokenizer_files = [
+                                                    "tokenizer.json",
+                                                    "tokenizer_config.json",
+                                                    "vocab.json",
+                                                    "merges.txt"
+                                                ]
+                                                has_tokenizer = any(os.path.exists(os.path.join(snapshot_path, f)) for f in tokenizer_files)
+                                                
+                                                # اگر فایل‌های ضروری موجود باشن
+                                                if has_required and (has_model or has_tokenizer):
+                                                    # بررسی اندازه فایل‌ها (باید بزرگتر از 1KB باشن)
+                                                    total_size = 0
+                                                    for root, dirs, files in os.walk(snapshot_path):
+                                                        for file in files:
+                                                            file_path = os.path.join(root, file)
+                                                            total_size += os.path.getsize(file_path)
                                                     
-                                                    # بررسی وجود فایل مدل
-                                                    model_files = ["pytorch_model.bin", "model.safetensors", "pytorch_model-00001-of-00001.bin"]
-                                                    has_model = any(os.path.exists(os.path.join(snapshot_path, f)) for f in model_files)
-                                                    
-                                                    if has_required and has_model:
+                                                    # اگر اندازه کل بیشتر از 1MB باشه، مدل دانلود شده
+                                                    if total_size > 1024 * 1024:  # 1MB
                                                         return True
-                        
-                        return False
+                    
+                    return False
                 
                 return False
             except Exception as e:
@@ -785,7 +833,7 @@ class ModelDownloader:
         
         try:
             if ModelDownloader.is_model_downloaded(model_id):
-                # برای مدل‌های Whisper، اطلاعات بیشتری ارائه بده
+                # برای مدل‌های مختلف، اطلاعات بیشتری ارائه بده
                 if model_info["type"] == "Whisper":
                     model_name = model_id.replace("whisper_", "")
                     if model_name == "large_v2":
@@ -802,6 +850,36 @@ class ModelDownloader:
                         return "دانلود شده", f"✅ مدل آماده استفاده است ({size_mb:.1f} MB)"
                     else:
                         return "دانلود شده", "✅ مدل آماده استفاده است (در cache)"
+                
+                elif model_info["type"] == "HuggingFace":
+                    # برای مدل‌های HuggingFace، بررسی cache
+                    model_url = model_info["url"]
+                    if model_url.startswith("huggingface://"):
+                        model_name = model_url.replace("huggingface://", "")
+                        
+                        # بررسی cache برای نمایش اندازه
+                        cache_dir = os.path.expanduser("~/.cache/huggingface/hub")
+                        if os.path.exists(cache_dir):
+                            for item in os.listdir(cache_dir):
+                                if model_name.replace("/", "--") in item:
+                                    model_cache_dir = os.path.join(cache_dir, item)
+                                    snapshots_dir = os.path.join(model_cache_dir, "snapshots")
+                                    if os.path.exists(snapshots_dir):
+                                        for snapshot in os.listdir(snapshots_dir):
+                                            snapshot_path = os.path.join(snapshots_dir, snapshot)
+                                            if os.path.isdir(snapshot_path):
+                                                # محاسبه اندازه
+                                                total_size = 0
+                                                for root, dirs, files in os.walk(snapshot_path):
+                                                    for file in files:
+                                                        file_path = os.path.join(root, file)
+                                                        total_size += os.path.getsize(file_path)
+                                                
+                                                size_mb = total_size / (1024 * 1024)
+                                                return "دانلود شده", f"✅ مدل آماده استفاده است ({size_mb:.1f} MB)"
+                        
+                        return "دانلود شده", "✅ مدل آماده استفاده است (در cache)"
+                
                 else:
                     return "دانلود شده", "✅ مدل آماده استفاده است"
             else:
@@ -889,6 +967,136 @@ class ModelDownloader:
             return "Success", models
         except Exception as e:
             return f"Error: {str(e)}", []
+    
+    @staticmethod
+    def validate_huggingface_model(model_name):
+        """اعتبارسنجی مدل HuggingFace"""
+        try:
+            from transformers import AutoModel, AutoTokenizer
+            
+            # تست بارگذاری tokenizer
+            try:
+                tokenizer = AutoTokenizer.from_pretrained(model_name, local_files_only=True)
+            except Exception as e:
+                return False, f"Tokenizer خراب: {str(e)}"
+            
+            # تست بارگذاری مدل
+            try:
+                model = AutoModel.from_pretrained(model_name, local_files_only=True)
+            except Exception as e:
+                return False, f"مدل خراب: {str(e)}"
+            
+            return True, "مدل سالم است"
+            
+        except Exception as e:
+            return False, f"خطا در اعتبارسنجی: {str(e)}"
+    
+    @staticmethod
+    def get_available_huggingface_models():
+        """دریافت لیست مدل‌های HuggingFace موجود در cache"""
+        try:
+            import os
+            cache_dir = os.path.expanduser("~/.cache/huggingface/hub")
+            
+            if not os.path.exists(cache_dir):
+                return []
+            
+            available_models = []
+            for item in os.listdir(cache_dir):
+                if item.startswith("models--") and os.path.isdir(os.path.join(cache_dir, item)):
+                    # تبدیل نام فولدر به نام مدل
+                    model_name = item.replace("models--", "").replace("--", "/")
+                    
+                    # بررسی اینکه آیا این مدل در لیست مدل‌های پشتیبانی شده هست
+                    for model_id, model_info in ModelDownloader.DOWNLOADABLE_MODELS.items():
+                        if model_info["type"] == "HuggingFace":
+                            model_url = model_info["url"]
+                            if model_url.startswith("huggingface://"):
+                                hf_model_name = model_url.replace("huggingface://", "")
+                                if model_name == hf_model_name:
+                                    available_models.append({
+                                        'model_id': model_id,
+                                        'model_name': model_name,
+                                        'display_name': model_info['name'],
+                                        'size': model_info['size']
+                                    })
+                                    break
+            
+            return available_models
+        except Exception as e:
+            print(f"خطا در دریافت مدل‌های موجود: {e}")
+            return []
+    
+    @staticmethod
+    def debug_model_detection():
+        """دیباگ تشخیص مدل‌ها"""
+        try:
+            import os
+            cache_dir = os.path.expanduser("~/.cache/huggingface/hub")
+            
+            print(f"Cache directory: {cache_dir}")
+            print(f"Cache exists: {os.path.exists(cache_dir)}")
+            
+            if not os.path.exists(cache_dir):
+                return "Cache directory not found"
+            
+            print("\n=== Cache Contents ===")
+            for item in os.listdir(cache_dir):
+                if item.startswith("models--"):
+                    print(f"Found: {item}")
+            
+            print("\n=== Model Detection Test ===")
+            for model_id, model_info in ModelDownloader.DOWNLOADABLE_MODELS.items():
+                if model_info["type"] == "HuggingFace":
+                    model_url = model_info["url"]
+                    if model_url.startswith("huggingface://"):
+                        model_name = model_url.replace("huggingface://", "")
+                        model_cache_name = model_name.replace("/", "--")
+                        
+                        print(f"\nModel: {model_id}")
+                        print(f"  HF Name: {model_name}")
+                        print(f"  Cache Name: {model_cache_name}")
+                        
+                        # بررسی وجود در cache
+                        found_in_cache = False
+                        for item in os.listdir(cache_dir):
+                            if model_cache_name in item:
+                                found_in_cache = True
+                                print(f"  ✅ Found in cache: {item}")
+                                
+                                # بررسی snapshots
+                                model_cache_dir = os.path.join(cache_dir, item)
+                                snapshots_dir = os.path.join(model_cache_dir, "snapshots")
+                                if os.path.exists(snapshots_dir):
+                                    snapshots = os.listdir(snapshots_dir)
+                                    print(f"  Snapshots: {snapshots}")
+                                    
+                                    if snapshots:
+                                        snapshot_path = os.path.join(snapshots_dir, snapshots[0])
+                                        files = os.listdir(snapshot_path)
+                                        print(f"  Files: {files}")
+                                        
+                                        # بررسی فایل‌های ضروری
+                                        has_config = "config.json" in files
+                                        has_model = any(f.endswith(('.bin', '.safetensors')) for f in files)
+                                        has_tokenizer = any(f.startswith(('tokenizer', 'vocab', 'merges')) for f in files)
+                                        
+                                        print(f"  Has config: {has_config}")
+                                        print(f"  Has model: {has_model}")
+                                        print(f"  Has tokenizer: {has_tokenizer}")
+                                        
+                                        # تست تابع is_model_downloaded
+                                        is_downloaded = ModelDownloader.is_model_downloaded(model_id)
+                                        print(f"  is_model_downloaded: {is_downloaded}")
+                                break
+                        
+                        if not found_in_cache:
+                            print(f"  ❌ Not found in cache")
+            
+            return "Debug completed"
+            
+        except Exception as e:
+            return f"Debug error: {str(e)}"
 
 class ModelDownloadDialog(QDialog):
     """دیالوگ دانلود مدل با نوار پیشرفت"""
@@ -1147,6 +1355,9 @@ class ModelDownloadThread(QThread):
             from transformers import AutoModel, AutoTokenizer
             import os
             import shutil
+            import ssl
+            import urllib.request
+            import socket
             
             # استخراج نام مدل از URL
             model_url = self.model_info["url"]
@@ -1170,42 +1381,75 @@ class ModelDownloadThread(QThread):
                 # مدل موجود نیست، ادامه دانلود
                 pass
             
+            # تنظیم SSL برای حل مشکل SSL
+            self.status.emit("تنظیم اتصال امن...")
+            self.progress.emit(15)
+            ModelDownloader._setup_ssl_context()
+            
             # پاک کردن cache خراب قبل از دانلود
             self.status.emit("بررسی و پاک کردن cache خراب...")
-            self.progress.emit(15)
+            self.progress.emit(20)
             self._clean_corrupted_cache(model_name)
             
             self.status.emit(f"در حال دانلود مدل Hugging Face {model_name}...")
-            self.progress.emit(20)
+            self.progress.emit(25)
             
-            # دانلود tokenizer
-            self.status.emit("در حال دانلود tokenizer...")
-            self.progress.emit(40)
-            tokenizer = AutoTokenizer.from_pretrained(model_name, force_download=False)
-            
-            # دانلود مدل
-            self.status.emit("در حال دانلود مدل...")
-            self.progress.emit(70)
-            model = AutoModel.from_pretrained(model_name, force_download=False)
-            
-            # اعتبارسنجی نهایی
-            self.status.emit("اعتبارسنجی مدل...")
-            self.progress.emit(90)
-            
-            # تست بارگذاری مجدد برای اطمینان
-            try:
-                AutoTokenizer.from_pretrained(model_name, local_files_only=True)
-                AutoModel.from_pretrained(model_name, local_files_only=True)
-            except Exception as e:
-                return False, f"مدل دانلود شد اما خراب است: {str(e)}"
-            
-            self.progress.emit(100)
-            self.status.emit("دانلود کامل شد!")
-            
-            return True, f"مدل {model_name} با موفقیت دانلود شد"
+            # تلاش برای دانلود با retry
+            max_retries = 3
+            for attempt in range(max_retries):
+                try:
+                    self.status.emit(f"تلاش {attempt + 1} از {max_retries}...")
+                    self.progress.emit(30 + (attempt * 20))
+                    
+                    # دانلود tokenizer
+                    self.status.emit("در حال دانلود tokenizer...")
+                    tokenizer = AutoTokenizer.from_pretrained(model_name, force_download=False)
+                    
+                    # دانلود مدل
+                    self.status.emit("در حال دانلود مدل...")
+                    model = AutoModel.from_pretrained(model_name, force_download=False)
+                    
+                    # اعتبارسنجی نهایی
+                    self.status.emit("اعتبارسنجی مدل...")
+                    self.progress.emit(90)
+                    
+                    # تست بارگذاری مجدد برای اطمینان
+                    try:
+                        AutoTokenizer.from_pretrained(model_name, local_files_only=True)
+                        AutoModel.from_pretrained(model_name, local_files_only=True)
+                    except Exception as e:
+                        return False, f"مدل دانلود شد اما خراب است: {str(e)}"
+                    
+                    self.progress.emit(100)
+                    self.status.emit("دانلود کامل شد!")
+                    
+                    return True, f"مدل {model_name} با موفقیت دانلود شد"
+                    
+                except Exception as e:
+                    if attempt < max_retries - 1:
+                        self.status.emit(f"خطا در تلاش {attempt + 1}: {str(e)[:50]}... تلاش مجدد...")
+                        import time
+                        time.sleep(2)  # صبر 2 ثانیه قبل از تلاش مجدد
+                        continue
+                    else:
+                        raise e
             
         except Exception as e:
-            return False, f"خطا در دانلود Hugging Face: {str(e)}"
+            error_msg = str(e)
+            if "SSL" in error_msg or "EOF" in error_msg or "MaxRetryError" in error_msg:
+                return False, f"""خطای اتصال SSL در دانلود HuggingFace: {error_msg}
+
+راه‌حل‌های پیشنهادی:
+1. اتصال اینترنت خود را بررسی کنید
+2. VPN را خاموش کنید
+3. فایروال را بررسی کنید
+4. از مدل‌های جایگزین استفاده کنید:
+   • Vosk Persian (بهترین برای فارسی)
+   • Whisper عادی (بدون HuggingFace)
+5. دوباره تلاش کنید
+"""
+            else:
+                return False, f"خطا در دانلود Hugging Face: {error_msg}"
     
     def _clean_corrupted_cache(self, model_name):
         """پاک کردن cache خراب مدل"""
@@ -1346,6 +1590,18 @@ class DownloadedModelsManager(QDialog):
         """)
         self.clean_cache_button.clicked.connect(self.clean_corrupted_cache)
         button_layout.addWidget(self.clean_cache_button)
+        
+        self.debug_button = QPushButton("🔍 دیباگ")
+        self.debug_button.setStyleSheet("""
+            QPushButton {
+                background-color: #9C27B0;
+            }
+            QPushButton:hover {
+                background-color: #7B1FA2;
+            }
+        """)
+        self.debug_button.clicked.connect(self.debug_model_detection)
+        button_layout.addWidget(self.debug_button)
         
         layout.addLayout(button_layout)
         
@@ -1549,6 +1805,46 @@ class DownloadedModelsManager(QDialog):
                 
         except Exception as e:
             QMessageBox.critical(self, "خطا", f"خطا در پاک کردن cache:\n{str(e)}")
+    
+    def debug_model_detection(self):
+        """دیباگ تشخیص مدل‌ها"""
+        try:
+            debug_result = ModelDownloader.debug_model_detection()
+            
+            # نمایش نتیجه در یک دیالوگ
+            from PySide6.QtWidgets import QTextEdit, QVBoxLayout, QDialog, QPushButton
+            
+            debug_dialog = QDialog(self)
+            debug_dialog.setWindowTitle("نتیجه دیباگ")
+            debug_dialog.setModal(True)
+            debug_dialog.resize(600, 400)
+            
+            layout = QVBoxLayout(debug_dialog)
+            
+            text_edit = QTextEdit()
+            text_edit.setPlainText(debug_result)
+            text_edit.setReadOnly(True)
+            text_edit.setStyleSheet("""
+                QTextEdit {
+                    background-color: #2d2d2d;
+                    color: #ffffff;
+                    border: 1px solid #444444;
+                    border-radius: 8px;
+                    padding: 10px;
+                    font-family: 'Consolas', 'Monaco', monospace;
+                    font-size: 12px;
+                }
+            """)
+            layout.addWidget(text_edit)
+            
+            close_button = QPushButton("بستن")
+            close_button.clicked.connect(debug_dialog.accept)
+            layout.addWidget(close_button)
+            
+            debug_dialog.exec()
+            
+        except Exception as e:
+            QMessageBox.critical(self, "خطا", f"خطا در دیباگ:\n{str(e)}")
 
 class ModelSelectionDialog(QDialog):
     def __init__(self, parent=None):
@@ -1781,8 +2077,6 @@ class ModelSelectionDialog(QDialog):
             ("hf_wav2vec2_persian_v3", "🏆 Wav2Vec2 Persian V3 - بهترین کیفیت فارسی (1.2 GB)", "persian", "offline"),
             ("hf_wav2vec2_persian_jonatas", "⭐ Wav2Vec2 Persian Jonatas - مدل بهینه شده (1.2 GB)", "persian", "offline"),
             ("hf_whisper_large_v3_persian", "✅ Whisper Large V3 Persian - بهترین کیفیت (3.1 GB)", "persian", "offline"),
-            ("hf_whisper_large_v3_persian_alt", "✅ Whisper Large V3 Persian Alt - جایگزین (3.1 GB)", "persian", "offline"),
-            ("hf_whisper_large_persian_steja", "✅ Whisper Large Persian Steja - مخصوص فارسی (3.1 GB)", "persian", "offline"),
             ("hf_wav2vec2_persian_alt", "⚠️ Wav2Vec2 Multilingual - چند زبانه (1.2 GB)", "both", "offline"),
             ("hf_whisper_tiny", "⚠️ Whisper Tiny HF - ضعیف برای فارسی (75 MB)", "both", "offline"),
             ("hf_whisper_base", "⚠️ Whisper Base HF - ضعیف برای فارسی (142 MB)", "both", "offline"),
@@ -2430,12 +2724,32 @@ class TranscribeThread(QThread):
         try:
             if "whisper" in model_name.lower():
                 from transformers import WhisperForConditionalGeneration, WhisperProcessor
-                processor = WhisperProcessor.from_pretrained(model_name)
-                model = WhisperForConditionalGeneration.from_pretrained(model_name)
+                
+                # تلاش برای بارگذاری با تنظیمات مختلف
+                try:
+                    processor = WhisperProcessor.from_pretrained(model_name, local_files_only=True)
+                    model = WhisperForConditionalGeneration.from_pretrained(model_name, local_files_only=True)
+                except Exception as e:
+                    if "Unable to load weights" in str(e) or "pytorch_model.bin" in str(e):
+                        # فایل مدل خراب است، حذف کن و دوباره دانلود کن
+                        self._clean_corrupted_model_cache(model_name)
+                        processor = WhisperProcessor.from_pretrained(model_name, force_download=True)
+                        model = WhisperForConditionalGeneration.from_pretrained(model_name, force_download=True)
+                    else:
+                        raise e
             else:
                 # مدل‌های Wav2Vec2
-                processor = AutoProcessor.from_pretrained(model_name)
-                model = AutoModelForCTC.from_pretrained(model_name)
+                try:
+                    processor = AutoProcessor.from_pretrained(model_name, local_files_only=True)
+                    model = AutoModelForCTC.from_pretrained(model_name, local_files_only=True)
+                except Exception as e:
+                    if "Unable to load weights" in str(e) or "pytorch_model.bin" in str(e):
+                        # فایل مدل خراب است، حذف کن و دوباره دانلود کن
+                        self._clean_corrupted_model_cache(model_name)
+                        processor = AutoProcessor.from_pretrained(model_name, force_download=True)
+                        model = AutoModelForCTC.from_pretrained(model_name, force_download=True)
+                    else:
+                        raise e
             
             return processor, model, None
             
@@ -2447,8 +2761,42 @@ class TranscribeThread(QThread):
                 return None, None, f"مشکل GPU: {error_msg}. از مدل‌های CPU استفاده کنید."
             elif "memory" in error_msg.lower():
                 return None, None, f"کمبود حافظه: {error_msg}. از مدل‌های کوچک‌تر استفاده کنید."
+            elif "Unable to load weights" in error_msg or "pytorch_model.bin" in error_msg:
+                return None, None, f"""فایل مدل خراب است: {error_msg}
+
+راه‌حل‌های پیشنهادی:
+1. مدل را دوباره دانلود کنید
+2. Cache مدل را پاک کنید
+3. از مدل‌های جایگزین استفاده کنید:
+   • Vosk Persian (بهترین برای فارسی)
+   • Whisper عادی (بدون HuggingFace)
+4. اتصال اینترنت را بررسی کنید
+"""
             else:
                 return None, None, f"خطا در بارگذاری مدل: {error_msg}"
+    
+    def _clean_corrupted_model_cache(self, model_name):
+        """پاک کردن cache خراب مدل HuggingFace"""
+        try:
+            import os
+            import shutil
+            
+            cache_dir = os.path.expanduser("~/.cache/huggingface/hub")
+            if not os.path.exists(cache_dir):
+                return
+            
+            # پیدا کردن فولدر مدل
+            model_cache_name = model_name.replace("/", "--")
+            for item in os.listdir(cache_dir):
+                if model_cache_name in item:
+                    model_cache_dir = os.path.join(cache_dir, item)
+                    if os.path.exists(model_cache_dir):
+                        # حذف کل فولدر مدل
+                        shutil.rmtree(model_cache_dir)
+                        print(f"Cache خراب مدل {model_name} حذف شد")
+                        break
+        except Exception as e:
+            print(f"خطا در پاک کردن cache مدل: {e}")
     
     def transcribe_with_huggingface(self, audio_file):
         """تبدیل صوت به متن با Hugging Face Transformers"""
@@ -2463,10 +2811,6 @@ class TranscribeThread(QThread):
                 model_name = "jonatasgrosman/wav2vec2-large-xlsr-53-persian"
             elif self.model_name == "hf_whisper_large_v3_persian":
                 model_name = "nezamisafa/whisper-large-v3-persian"
-            elif self.model_name == "hf_whisper_large_v3_persian_alt":
-                model_name = "MohammadKhosravi/whisper-large-v3-Persian"
-            elif self.model_name == "hf_whisper_large_persian_steja":
-                model_name = "steja/whisper-large-persian"
             elif self.model_name == "hf_wav2vec2_persian_alt":
                 model_name = "facebook/wav2vec2-large-xlsr-53"
             elif self.model_name == "hf_whisper_tiny":
