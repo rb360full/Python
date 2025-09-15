@@ -676,6 +676,9 @@ class ModelDownloader:
         # برای مدل‌های Whisper
         if model_info["type"] == "Whisper":
             try:
+                import whisper
+                import os
+                
                 model_name = model_id.replace("whisper_", "")
                 # تبدیل نام مدل برای Whisper
                 if model_name == "large_v2":
@@ -683,17 +686,34 @@ class ModelDownloader:
                 elif model_name == "large_v3":
                     model_name = "large-v3"
                 
-                # بررسی وجود مدل در cache Whisper
-                import whisper
-                import os
-                
                 # مسیر cache Whisper
                 cache_dir = os.path.expanduser("~/.cache/whisper")
-                model_file = f"{model_name}.pt"
-                model_path = os.path.join(cache_dir, model_file)
                 
-                return os.path.exists(model_path)
-            except:
+                # بررسی فایل‌های مختلف که ممکنه مدل با اونها ذخیره بشه
+                possible_files = [
+                    f"{model_name}.pt",
+                    f"{model_name}.bin",
+                    f"{model_name}.safetensors",
+                    f"{model_name}.pth"
+                ]
+                
+                # بررسی وجود هر کدوم از فایل‌ها
+                for model_file in possible_files:
+                    model_path = os.path.join(cache_dir, model_file)
+                    if os.path.exists(model_path):
+                        # بررسی اندازه فایل (باید بزرگتر از 1MB باشه)
+                        if os.path.getsize(model_path) > 1024 * 1024:  # 1MB
+                            return True
+                
+                # اگر فایل پیدا نشد، تست بارگذاری مستقیم
+                try:
+                    whisper.load_model(model_name)
+                    return True
+                except:
+                    return False
+                    
+            except Exception as e:
+                print(f"خطا در بررسی مدل Whisper: {e}")
                 return False
         
         # برای مدل‌های Vosk
@@ -713,44 +733,40 @@ class ModelDownloader:
                 if model_url.startswith("huggingface://"):
                     model_name = model_url.replace("huggingface://", "")
                     
-                    # بررسی cache محلی Hugging Face
-                    cache_dir = os.path.expanduser("~/.cache/huggingface/hub")
-                    
-                    # جستجو در فولدرهای cache
-                    if os.path.exists(cache_dir):
-                        for item in os.listdir(cache_dir):
-                            if model_name.replace("/", "--") in item:
-                                # بررسی وجود فایل‌های ضروری
-                                model_cache_dir = os.path.join(cache_dir, item)
-                                if os.path.exists(model_cache_dir):
-                                    # بررسی snapshots
-                                    snapshots_dir = os.path.join(model_cache_dir, "snapshots")
-                                    if os.path.exists(snapshots_dir):
-                                        for snapshot in os.listdir(snapshots_dir):
-                                            snapshot_path = os.path.join(snapshots_dir, snapshot)
-                                            if os.path.isdir(snapshot_path):
-                                                # بررسی وجود فایل‌های ضروری
-                                                required_files = ["config.json"]
-                                                has_required = all(os.path.exists(os.path.join(snapshot_path, f)) for f in required_files)
-                                                
-                                                # بررسی وجود فایل مدل (pytorch_model.bin یا model.safetensors)
-                                                model_files = ["pytorch_model.bin", "model.safetensors"]
-                                                has_model = any(os.path.exists(os.path.join(snapshot_path, f)) for f in model_files)
-                                                
-                                                if has_required and has_model:
-                                                    # تست بارگذاری برای اطمینان از سلامت فایل
-                                                    try:
-                                                        # تست بارگذاری tokenizer
-                                                        AutoTokenizer.from_pretrained(snapshot_path, local_files_only=True)
-                                                        # تست بارگذاری مدل
-                                                        AutoModel.from_pretrained(snapshot_path, local_files_only=True)
+                    # تست بارگذاری مستقیم - ساده‌ترین روش
+                    try:
+                        # تست بارگذاری tokenizer
+                        AutoTokenizer.from_pretrained(model_name, local_files_only=True)
+                        # تست بارگذاری مدل
+                        AutoModel.from_pretrained(model_name, local_files_only=True)
+                        return True
+                    except:
+                        # اگر بارگذاری محلی موفق نبود، بررسی cache
+                        cache_dir = os.path.expanduser("~/.cache/huggingface/hub")
+                        
+                        if os.path.exists(cache_dir):
+                            for item in os.listdir(cache_dir):
+                                if model_name.replace("/", "--") in item:
+                                    model_cache_dir = os.path.join(cache_dir, item)
+                                    if os.path.exists(model_cache_dir):
+                                        # بررسی snapshots
+                                        snapshots_dir = os.path.join(model_cache_dir, "snapshots")
+                                        if os.path.exists(snapshots_dir):
+                                            for snapshot in os.listdir(snapshots_dir):
+                                                snapshot_path = os.path.join(snapshots_dir, snapshot)
+                                                if os.path.isdir(snapshot_path):
+                                                    # بررسی وجود فایل‌های ضروری
+                                                    required_files = ["config.json"]
+                                                    has_required = all(os.path.exists(os.path.join(snapshot_path, f)) for f in required_files)
+                                                    
+                                                    # بررسی وجود فایل مدل
+                                                    model_files = ["pytorch_model.bin", "model.safetensors", "pytorch_model-00001-of-00001.bin"]
+                                                    has_model = any(os.path.exists(os.path.join(snapshot_path, f)) for f in model_files)
+                                                    
+                                                    if has_required and has_model:
                                                         return True
-                                                    except Exception as e:
-                                                        # فایل خراب است، اما حذف نکن - فقط False برگردان
-                                                        print(f"مدل خراب تشخیص داده شد: {e}")
-                                                        return False
-                    
-                    return False
+                        
+                        return False
                 
                 return False
             except Exception as e:
@@ -769,7 +785,25 @@ class ModelDownloader:
         
         try:
             if ModelDownloader.is_model_downloaded(model_id):
-                return "دانلود شده", "✅ مدل آماده استفاده است"
+                # برای مدل‌های Whisper، اطلاعات بیشتری ارائه بده
+                if model_info["type"] == "Whisper":
+                    model_name = model_id.replace("whisper_", "")
+                    if model_name == "large_v2":
+                        model_name = "large-v2"
+                    elif model_name == "large_v3":
+                        model_name = "large-v3"
+                    
+                    cache_dir = os.path.expanduser("~/.cache/whisper")
+                    model_file = f"{model_name}.pt"
+                    model_path = os.path.join(cache_dir, model_file)
+                    
+                    if os.path.exists(model_path):
+                        size_mb = os.path.getsize(model_path) / (1024 * 1024)
+                        return "دانلود شده", f"✅ مدل آماده استفاده است ({size_mb:.1f} MB)"
+                    else:
+                        return "دانلود شده", "✅ مدل آماده استفاده است (در cache)"
+                else:
+                    return "دانلود شده", "✅ مدل آماده استفاده است"
             else:
                 return "دانلود نشده", "❌ مدل دانلود نشده است"
         except Exception as e:
@@ -790,6 +824,71 @@ class ModelDownloader:
             return True, "اتصال شبکه برقرار است"
         except Exception as e:
             return False, f"مشکل در اتصال شبکه: {str(e)}"
+    
+    @staticmethod
+    def get_whisper_cache_info():
+        """دریافت اطلاعات cache مدل‌های Whisper"""
+        try:
+            import os
+            cache_dir = os.path.expanduser("~/.cache/whisper")
+            
+            if not os.path.exists(cache_dir):
+                return "Cache directory not found", []
+            
+            models = []
+            for file in os.listdir(cache_dir):
+                if file.endswith(('.pt', '.bin', '.safetensors', '.pth')):
+                    file_path = os.path.join(cache_dir, file)
+                    size_mb = os.path.getsize(file_path) / (1024 * 1024)
+                    models.append({
+                        'name': file,
+                        'size_mb': size_mb,
+                        'path': file_path
+                    })
+            
+            return "Success", models
+        except Exception as e:
+            return f"Error: {str(e)}", []
+    
+    @staticmethod
+    def get_huggingface_cache_info():
+        """دریافت اطلاعات cache مدل‌های HuggingFace"""
+        try:
+            import os
+            cache_dir = os.path.expanduser("~/.cache/huggingface/hub")
+            
+            if not os.path.exists(cache_dir):
+                return "Cache directory not found", []
+            
+            models = []
+            for item in os.listdir(cache_dir):
+                if os.path.isdir(os.path.join(cache_dir, item)):
+                    model_cache_dir = os.path.join(cache_dir, item)
+                    snapshots_dir = os.path.join(model_cache_dir, "snapshots")
+                    
+                    if os.path.exists(snapshots_dir):
+                        for snapshot in os.listdir(snapshots_dir):
+                            snapshot_path = os.path.join(snapshots_dir, snapshot)
+                            if os.path.isdir(snapshot_path):
+                                # محاسبه اندازه کل snapshot
+                                total_size = 0
+                                for root, dirs, files in os.walk(snapshot_path):
+                                    for file in files:
+                                        file_path = os.path.join(root, file)
+                                        total_size += os.path.getsize(file_path)
+                                
+                                size_mb = total_size / (1024 * 1024)
+                                models.append({
+                                    'name': item.replace("--", "/"),
+                                    'snapshot': snapshot,
+                                    'size_mb': size_mb,
+                                    'path': snapshot_path
+                                })
+                                break  # فقط اولین snapshot رو بگیر
+            
+            return "Success", models
+        except Exception as e:
+            return f"Error: {str(e)}", []
 
 class ModelDownloadDialog(QDialog):
     """دیالوگ دانلود مدل با نوار پیشرفت"""
@@ -2326,207 +2425,71 @@ class TranscribeThread(QThread):
         except Exception as e:
             return f"AssemblyAI Error: {str(e)}"
     
+    def _load_huggingface_model(self, model_name):
+        """بارگذاری مدل HuggingFace با مدیریت خطا"""
+        try:
+            if "whisper" in model_name.lower():
+                from transformers import WhisperForConditionalGeneration, WhisperProcessor
+                processor = WhisperProcessor.from_pretrained(model_name)
+                model = WhisperForConditionalGeneration.from_pretrained(model_name)
+            else:
+                # مدل‌های Wav2Vec2
+                processor = AutoProcessor.from_pretrained(model_name)
+                model = AutoModelForCTC.from_pretrained(model_name)
+            
+            return processor, model, None
+            
+        except Exception as e:
+            error_msg = str(e)
+            if "not a valid model identifier" in error_msg:
+                return None, None, f"مدل {model_name} یافت نشد. لطفاً اتصال اینترنت را بررسی کنید."
+            elif "CUDA" in error_msg or "GPU" in error_msg:
+                return None, None, f"مشکل GPU: {error_msg}. از مدل‌های CPU استفاده کنید."
+            elif "memory" in error_msg.lower():
+                return None, None, f"کمبود حافظه: {error_msg}. از مدل‌های کوچک‌تر استفاده کنید."
+            else:
+                return None, None, f"خطا در بارگذاری مدل: {error_msg}"
+    
     def transcribe_with_huggingface(self, audio_file):
         """تبدیل صوت به متن با Hugging Face Transformers"""
         try:
             # بارگذاری مدل بر اساس نوع
+            model_name = None
             if self.model_name == "hf_wav2vec2_persian":
-                # تلاش برای بارگذاری مدل فارسی
-                try:
-                    model_name = "m3hrdadfi/wav2vec2-large-xlsr-persian"
-                    processor = AutoProcessor.from_pretrained(model_name)
-                    model = AutoModelForCTC.from_pretrained(model_name)
-                except Exception as e:
-                    error_msg = str(e)
-                    if "not a valid model identifier" in error_msg:
-                        return f"""Hugging Face Error: مدل فارسی در دسترس نیست
-
-مشکل: مدل m3hrdadfi/wav2vec2-large-xlsr-persian یافت نشد
-
-راه‌حل‌ها:
-1. اتصال اینترنت خود را بررسی کنید
-2. از مدل جدیدتر استفاده کنید: Wav2Vec2 Persian V3
-3. Token Hugging Face خود را تنظیم کنید:
-   huggingface-cli login
-   یا
-   hf auth login
-"""
-                    else:
-                        return f"Hugging Face Error: {error_msg}. لطفاً از Vosk Persian یا Whisper استفاده کنید."
-                        
+                model_name = "m3hrdadfi/wav2vec2-large-xlsr-persian"
             elif self.model_name == "hf_wav2vec2_persian_v3":
-                # تلاش برای بارگذاری مدل فارسی V3 (جدیدترین نسخه)
-                try:
-                    model_name = "m3hrdadfi/wav2vec2-large-xlsr-persian-v3"
-                    processor = AutoProcessor.from_pretrained(model_name)
-                    model = AutoModelForCTC.from_pretrained(model_name)
-                except Exception as e:
-                    error_msg = str(e)
-                    if "not a valid model identifier" in error_msg:
-                        return f"""Hugging Face Error: مدل فارسی V3 در دسترس نیست
-
-مشکل: مدل m3hrdadfi/wav2vec2-large-xlsr-persian-v3 یافت نشد
-
-راه‌حل‌ها:
-1. اتصال اینترنت خود را بررسی کنید
-2. از مدل‌های جایگزین استفاده کنید:
-   • Wav2Vec2 Persian (نسخه قبلی)
-   • Vosk Persian (بهترین برای فارسی)
-   • Whisper Medium/Large (چند زبانه)
-
-برای استفاده از Hugging Face:
-1. به https://huggingface.co بروید
-2. حساب کاربری بسازید
-3. از دستور زیر استفاده کنید:
-   hf auth login
-"""
-                    else:
-                        return f"Hugging Face Error: {error_msg}. لطفاً از Vosk Persian یا Whisper استفاده کنید."
-                        
+                model_name = "m3hrdadfi/wav2vec2-large-xlsr-persian-v3"
             elif self.model_name == "hf_wav2vec2_persian_jonatas":
-                # تلاش برای بارگذاری مدل فارسی Jonatas (بهینه شده)
-                try:
-                    model_name = "jonatasgrosman/wav2vec2-large-xlsr-53-persian"
-                    processor = AutoProcessor.from_pretrained(model_name)
-                    model = AutoModelForCTC.from_pretrained(model_name)
-                except Exception as e:
-                    error_msg = str(e)
-                    if "not a valid model identifier" in error_msg:
-                        return f"""Hugging Face Error: مدل فارسی Jonatas در دسترس نیست
-
-مشکل: مدل jonatasgrosman/wav2vec2-large-xlsr-53-persian یافت نشد
-
-راه‌حل‌ها:
-1. اتصال اینترنت خود را بررسی کنید
-2. از مدل‌های جایگزین استفاده کنید:
-   • Wav2Vec2 Persian V3 (جدیدترین)
-   • Wav2Vec2 Persian (نسخه قبلی)
-   • Vosk Persian (بهترین برای فارسی)
-
-برای استفاده از Hugging Face:
-1. به https://huggingface.co بروید
-2. حساب کاربری بسازید
-3. از دستور زیر استفاده کنید:
-   hf auth login
-"""
-                    else:
-                        return f"Hugging Face Error: {error_msg}. لطفاً از Vosk Persian یا Whisper استفاده کنید."
-                        
-                    
+                model_name = "jonatasgrosman/wav2vec2-large-xlsr-53-persian"
             elif self.model_name == "hf_whisper_large_v3_persian":
-                # تلاش برای بارگذاری مدل Whisper فارسی
-                try:
-                    from transformers import WhisperForConditionalGeneration, WhisperProcessor
-                    model_name = "nezamisafa/whisper-large-v3-persian"
-                    processor = WhisperProcessor.from_pretrained(model_name)
-                    model = WhisperForConditionalGeneration.from_pretrained(model_name)
-                except Exception as e:
-                    error_msg = str(e)
-                    if "not a valid model identifier" in error_msg:
-                        return f"""Hugging Face Error: مدل Whisper فارسی در دسترس نیست
-
-مشکل: مدل nezamisafa/whisper-large-v3-persian یافت نشد
-
-راه‌حل‌ها:
-1. از مدل‌های جایگزین استفاده کنید:
-   • Whisper Medium/Large (چند زبانه)
-   • Vosk Persian (بهترین برای فارسی)
-   • Whisper عادی (Hugging Face)
-
-برای استفاده از Hugging Face:
-1. به https://huggingface.co بروید
-2. حساب کاربری بسازید
-3. از دستور زیر استفاده کنید:
-   hf auth login
-"""
-                    else:
-                        return f"Hugging Face Error: {error_msg}. لطفاً از Whisper عادی استفاده کنید."
-                        
+                model_name = "nezamisafa/whisper-large-v3-persian"
             elif self.model_name == "hf_whisper_large_v3_persian_alt":
-                # تلاش برای بارگذاری مدل Whisper فارسی جایگزین
-                try:
-                    from transformers import WhisperForConditionalGeneration, WhisperProcessor
-                    model_name = "MohammadKhosravi/whisper-large-v3-Persian"
-                    processor = WhisperProcessor.from_pretrained(model_name)
-                    model = WhisperForConditionalGeneration.from_pretrained(model_name)
-                except Exception as e:
-                    error_msg = str(e)
-                    if "not a valid model identifier" in error_msg:
-                        return f"""Hugging Face Error: مدل Whisper فارسی در دسترس نیست
-
-مشکل: مدل MohammadKhosravi/whisper-large-v3-Persian یافت نشد
-
-راه‌حل‌ها:
-1. از مدل‌های جایگزین استفاده کنید:
-   • Whisper Medium/Large (چند زبانه)
-   • Vosk Persian (بهترین برای فارسی)
-   • Whisper عادی (Hugging Face)
-
-برای استفاده از Hugging Face:
-1. به https://huggingface.co بروید
-2. حساب کاربری بسازید
-3. از دستور زیر استفاده کنید:
-   hf auth login
-"""
-                    else:
-                        return f"Hugging Face Error: {error_msg}. لطفاً از Whisper عادی استفاده کنید."
-                        
+                model_name = "MohammadKhosravi/whisper-large-v3-Persian"
             elif self.model_name == "hf_whisper_large_persian_steja":
-                # تلاش برای بارگذاری مدل Whisper فارسی Steja
-                try:
-                    from transformers import WhisperForConditionalGeneration, WhisperProcessor
-                    model_name = "steja/whisper-large-persian"
-                    processor = WhisperProcessor.from_pretrained(model_name)
-                    model = WhisperForConditionalGeneration.from_pretrained(model_name)
-                except Exception as e:
-                    error_msg = str(e)
-                    if "not a valid model identifier" in error_msg:
-                        return f"""Hugging Face Error: مدل Whisper فارسی Steja در دسترس نیست
-
-مشکل: مدل steja/whisper-large-persian یافت نشد
-
-راه‌حل‌ها:
-1. اتصال اینترنت خود را بررسی کنید
-2. از مدل‌های جایگزین استفاده کنید:
-   • Wav2Vec2 Persian V3 (بهترین کیفیت)
-   • Wav2Vec2 Persian (نسخه قبلی)
-   • Vosk Persian (بهترین برای فارسی)
-
-برای استفاده از Hugging Face:
-1. به https://huggingface.co بروید
-2. حساب کاربری بسازید
-3. از دستور زیر استفاده کنید:
-   hf auth login
-"""
-                    else:
-                        return f"Hugging Face Error: {error_msg}. لطفاً از Whisper عادی استفاده کنید."
-                    
+                model_name = "steja/whisper-large-persian"
             elif self.model_name == "hf_wav2vec2_persian_alt":
-                # استفاده از مدل عمومی wav2vec2
-                try:
-                    model_name = "facebook/wav2vec2-large-xlsr-53"
-                    processor = AutoProcessor.from_pretrained(model_name)
-                    model = AutoModelForCTC.from_pretrained(model_name)
-                except Exception as e:
-                    return f"Hugging Face Error: مدل wav2vec2 در دسترس نیست ({str(e)}). لطفاً از مدل‌های دیگر استفاده کنید."
+                model_name = "facebook/wav2vec2-large-xlsr-53"
+            elif self.model_name == "hf_whisper_tiny":
+                model_name = "openai/whisper-tiny"
+            elif self.model_name == "hf_whisper_base":
+                model_name = "openai/whisper-base"
+            elif self.model_name == "hf_whisper_small":
+                model_name = "openai/whisper-small"
+            elif self.model_name == "hf_whisper_medium":
+                model_name = "openai/whisper-medium"
+            elif self.model_name == "hf_whisper_large":
+                model_name = "openai/whisper-large-v2"
+            elif self.model_name == "hf_whisper_large_v2":
+                model_name = "openai/whisper-large-v2"
+            elif self.model_name == "hf_whisper_large_v3":
+                model_name = "openai/whisper-large-v3"
             else:
-                # مدل‌های عمومی Whisper
-                from transformers import WhisperForConditionalGeneration, WhisperProcessor
-                model_name = self.model_name.replace("hf_", "").replace("_hf", "")
-                if model_name == "whisper_large":
-                    model_name = "openai/whisper-large-v2"
-                elif model_name == "whisper_large_v2":
-                    model_name = "openai/whisper-large-v2"
-                elif model_name == "whisper_large_v3":
-                    model_name = "openai/whisper-large-v3"
-                else:
-                    model_name = f"openai/whisper-{model_name}"
-                
-                try:
-                    processor = WhisperProcessor.from_pretrained(model_name)
-                    model = WhisperForConditionalGeneration.from_pretrained(model_name)
-                except Exception as e:
-                    return f"Hugging Face Error: مدل {model_name} در دسترس نیست ({str(e)}). لطفاً از مدل‌های دیگر استفاده کنید."
+                return f"Hugging Face Error: مدل {self.model_name} پشتیبانی نمی‌شود"
+            
+            # بارگذاری مدل
+            processor, model, error = self._load_huggingface_model(model_name)
+            if error:
+                return f"Hugging Face Error: {error}"
             
             # بارگذاری فایل صوتی
             try:
@@ -2548,19 +2511,88 @@ class TranscribeThread(QThread):
             
             # پردازش
             try:
-                inputs = processor(audio, sampling_rate=sr, return_tensors="pt")
-                
-                # تشخیص
-                with torch.no_grad():
-                    logits = model(inputs.input_values).logits
-                
-                # تبدیل به متن
-                predicted_ids = torch.argmax(logits, dim=-1)
-                text = processor.batch_decode(predicted_ids)[0]
+                # بررسی نوع مدل و پردازش مناسب
+                if "whisper" in self.model_name.lower():
+                    # پردازش برای مدل‌های Whisper
+                    inputs = processor(audio, sampling_rate=sr, return_tensors="pt")
+                    
+                    # تشخیص
+                    with torch.no_grad():
+                        generated_ids = model.generate(
+                            inputs.input_features,
+                            max_length=448,
+                            num_beams=5,
+                            early_stopping=True
+                        )
+                    
+                    # تبدیل به متن
+                    text = processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
+                    
+                else:
+                    # پردازش برای مدل‌های Wav2Vec2
+                    inputs = processor(audio, sampling_rate=sr, return_tensors="pt")
+                    
+                    # تشخیص
+                    with torch.no_grad():
+                        logits = model(inputs.input_values).logits
+                    
+                    # تبدیل به متن
+                    predicted_ids = torch.argmax(logits, dim=-1)
+                    text = processor.batch_decode(predicted_ids)[0]
                 
                 return text.strip()
+                
             except Exception as e:
-                return f"Hugging Face Error: Model processing failed - {str(e)}"
+                error_msg = str(e)
+                
+                # تشخیص نوع خطا و ارائه راه‌حل
+                if "CUDA" in error_msg or "GPU" in error_msg:
+                    return f"""Hugging Face Error: مشکل GPU/CUDA
+
+خطا: {error_msg}
+
+راه‌حل‌ها:
+1. از CPU استفاده کنید (مدل‌های کوچک‌تر)
+2. GPU drivers را به‌روزرسانی کنید
+3. از مدل‌های Vosk یا Whisper استفاده کنید
+4. PyTorch CPU version نصب کنید:
+   pip install torch torchaudio --index-url https://download.pytorch.org/whl/cpu
+"""
+                elif "memory" in error_msg.lower() or "out of memory" in error_msg.lower():
+                    return f"""Hugging Face Error: کمبود حافظه
+
+خطا: {error_msg}
+
+راه‌حل‌ها:
+1. از مدل‌های کوچک‌تر استفاده کنید
+2. فایل صوتی را کوتاه‌تر کنید
+3. از Vosk Persian استفاده کنید (کمتر حافظه می‌خواهد)
+4. RAM سیستم را افزایش دهید
+"""
+                elif "audio" in error_msg.lower() or "sampling" in error_msg.lower():
+                    return f"""Hugging Face Error: مشکل فرمت صوتی
+
+خطا: {error_msg}
+
+راه‌حل‌ها:
+1. فایل صوتی را به WAV تبدیل کنید
+2. Sample rate را به 16000 Hz تنظیم کنید
+3. از فایل‌های صوتی کوتاه‌تر استفاده کنید
+4. از Vosk یا Whisper استفاده کنید
+"""
+                else:
+                    return f"""Hugging Face Error: Model processing failed
+
+خطا: {error_msg}
+
+راه‌حل‌های عمومی:
+1. مدل را دوباره دانلود کنید
+2. از مدل‌های جایگزین استفاده کنید:
+   • Vosk Persian (بهترین برای فارسی)
+   • Whisper Medium/Large
+3. فایل صوتی را بررسی کنید
+4. اتصال اینترنت را بررسی کنید
+"""
             
         except Exception as e:
             return f"Hugging Face Error: {str(e)}"
