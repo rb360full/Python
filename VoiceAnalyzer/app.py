@@ -406,6 +406,30 @@ class ModelDownloader:
             "warning": "✅ جدیدترین نسخه",
             "type": "HuggingFace"
         },
+        "hf_whisper_large_persian_steja": {
+            "url": "huggingface://steja/whisper-large-persian",
+            "name": "Whisper-Large-Persian-Steja",
+            "size": "3.1 GB",
+            "language": "فارسی",
+            "warning": "✅ بهینه برای فارسی",
+            "type": "HuggingFace"
+        },
+        "pyannote_diarization": {
+            "url": "huggingface://pyannote/speaker-diarization-3.1",
+            "name": "pyannote-speaker-diarization-3.1",
+            "size": "~1.6 GB",
+            "language": "چند زبانه",
+            "warning": "🔑 نیاز به HuggingFace Token (pyannote)",
+            "type": "Diarization"
+        },
+        "coqui_xtts_v2": {
+            "url": "huggingface://coqui/XTTS-v2",
+            "name": "Coqui XTTS v2",
+            "size": "~1.8 GB",
+            "language": "چند زبانه (شامل فارسی)",
+            "warning": "🎙️ برای خروجی فارسی مناسب است (نیاز به فضای دیسک)",
+            "type": "TTS"
+        },
         
         # SpeechRecognition
         "speechrecognition_google": {
@@ -584,45 +608,61 @@ class ModelDownloader:
     @staticmethod
     def _download_vosk_model(model_id, model_info, progress_callback=None):
         """دانلود مدل Vosk با نمایش نوتیفیکیشن ساده"""
-        models_dir = Path.home() / ".vosk" / "models"
-        models_dir.mkdir(parents=True, exist_ok=True)
-        
-        model_path = models_dir / model_info["name"]
-        
-        # اگر مدل قبلاً دانلود شده
-        if model_path.exists():
-            return True, str(model_path)
-        
         try:
-            # دانلود فایل
-            if progress_callback:
-                progress_callback(f"در حال دانلود {model_info['name']} ({model_info['size']})...")
+            import requests
+            import zipfile
+            from pathlib import Path
             
-            response = requests.get(model_info["url"], stream=True)
+            models_dir = Path.home() / ".vosk" / "models"
+            models_dir.mkdir(parents=True, exist_ok=True)
+            
+            model_path = models_dir / model_info["name"]
+            
+            # اگر مدل قبلاً دانلود شده
+            if model_path.exists():
+                self.progress.emit(100)
+                self.status.emit("مدل قبلاً دانلود شده!")
+                return True, f"مدل {self.model_info['name']} قبلاً دانلود شده"
+            
+            self.status.emit(f"در حال دانلود {self.model_info['name']}...")
+            self.progress.emit(10)
+            
+            # دانلود فایل
+            response = requests.get(self.model_info["url"], stream=True)
             response.raise_for_status()
             
-            # ذخیره فایل
-            zip_path = models_dir / f"{model_info['name']}.zip"
+            total_size = int(response.headers.get('content-length', 0))
+            downloaded_size = 0
+            
+            zip_path = models_dir / f"{self.model_info['name']}.zip"
             
             with open(zip_path, 'wb') as f:
                 for chunk in response.iter_content(chunk_size=8192):
                     if chunk:
                         f.write(chunk)
+                        downloaded_size += len(chunk)
+                        
+                        if total_size > 0:
+                            progress = int((downloaded_size / total_size) * 70) + 10  # 10-80%
+                            self.progress.emit(progress)
+            
+            self.status.emit("در حال استخراج مدل...")
+            self.progress.emit(85)
             
             # استخراج فایل
-            if progress_callback:
-                progress_callback("در حال استخراج مدل...")
-            
             with zipfile.ZipFile(zip_path, 'r') as zip_ref:
                 zip_ref.extractall(models_dir)
             
             # حذف فایل zip
             zip_path.unlink()
             
-            return True, str(model_path)
+            self.progress.emit(100)
+            self.status.emit("دانلود و استخراج کامل شد!")
+            
+            return True, f"مدل {self.model_info['name']} با موفقیت دانلود شد"
             
         except Exception as e:
-            return False, f"خطا در دانلود: {str(e)}"
+            return False, f"خطا در دانلود Vosk: {str(e)}"
     
     @staticmethod
     def _download_huggingface_model(model_id, model_info, progress_callback=None):
@@ -1229,6 +1269,10 @@ class ModelDownloadThread(QThread):
                 success, message = self._download_vosk_with_progress()
             elif self.model_info["type"] == "HuggingFace":
                 success, message = self._download_huggingface_with_progress()
+            elif self.model_info["type"] == "TTS":
+                success, message = self._download_tts_with_progress()
+            elif self.model_info["type"] == "Diarization":
+                success, message = self._download_pyannote_with_progress()
             else:
                 success, message = False, f"نوع مدل {self.model_info['type']} پشتیبانی نمی‌شود"
                 
@@ -1350,7 +1394,7 @@ class ModelDownloadThread(QThread):
             return False, f"خطا در دانلود Vosk: {str(e)}"
     
     def _download_huggingface_with_progress(self):
-        """دانلود مدل Hugging Face با نوار پیشرفت"""
+        """دانلود مدل Hugging Face با نمایش نوتیفیکیشن ساده"""
         try:
             from transformers import AutoModel, AutoTokenizer
             import os
@@ -1450,6 +1494,116 @@ class ModelDownloadThread(QThread):
 """
             else:
                 return False, f"خطا در دانلود Hugging Face: {error_msg}"
+    
+    def _download_tts_with_progress(self):
+        """دانلود/کش مدل Coqui XTTS با نوار پیشرفت ساده"""
+        try:
+            self.status.emit("در حال آماده‌سازی TTS...")
+            self.progress.emit(10)
+            
+            # ابتدا تلاش برای Coqui TTS
+            try:
+                from TTS.api import TTS
+                coqui_available = True
+            except Exception:
+                coqui_available = False
+            
+            if not coqui_available:
+                # اگر edge-tts نصب است، نیازی به دانلود نیست
+                try:
+                    import edge_tts  # noqa: F401
+                    self.progress.emit(100)
+                    self.status.emit("TTS آنلاین (edge-tts) آماده است")
+                    return True, "TTS آنلاین آماده شد (بدون دانلود)"
+                except Exception:
+                    return False, (
+                        "TTS Error: نه Coqui و نه edge-tts در دسترس نیستند.\n\n"
+                        "نصب یکی از موارد زیر:\n"
+                        "  pip install edge-tts\n"
+                        "یا برای آفلاین: pip install TTS==0.22.0 (نیازمند Python<3.12)\n"
+                    )
+            
+            model_name = "coqui/XTTS-v2"
+            
+            self.status.emit("در حال بارگذاری مدل TTS (ممکن است چند دقیقه طول بکشد)...")
+            self.progress.emit(30)
+            
+            try:
+                tts = TTS(model_name)
+            except Exception as e:
+                try:
+                    tts = TTS(model_name, gpu=False)
+                except Exception:
+                    # اگر Coqui شکست خورد، به edge-tts سوئیچ کن
+                    try:
+                        import edge_tts  # noqa: F401
+                        self.progress.emit(100)
+                        self.status.emit("TTS آنلاین (edge-tts) آماده است")
+                        return True, "TTS آنلاین آماده شد (بدون دانلود)"
+                    except Exception:
+                        return False, f"TTS Error: {e}"
+            
+            self.status.emit("دانلود مدل در حال تکمیل...")
+            self.progress.emit(70)
+            
+            import os, tempfile
+            with tempfile.TemporaryDirectory() as tmp:
+                test_path = os.path.join(tmp, "test.wav")
+                try:
+                    tts.tts_to_file(text="salam", file_path=test_path, language="fa")
+                except Exception:
+                    pass
+            
+            self.progress.emit(100)
+            self.status.emit("TTS آماده است")
+            return True, "مدل TTS با موفقیت آماده شد"
+        except Exception as e:
+            return False, f"TTS Error: {str(e)}"
+    
+    def _download_pyannote_with_progress(self):
+        """دانلود/کش مدل pyannote diarization با نوار پیشرفت ساده"""
+        try:
+            self.status.emit("در حال آماده‌سازی pyannote...")
+            self.progress.emit(10)
+            
+            import os
+            token = os.getenv("PYANNOTE_TOKEN") or os.getenv("HUGGINGFACE_TOKEN") or os.getenv("HF_TOKEN")
+            if not token:
+                return False, (
+                    "Pyannote Error: نیاز به HuggingFace Token دارد.\n\n"
+                    "لطفاً یکی از این متغیرها را تنظیم کنید و دوباره امتحان کنید:\n"
+                    "  setx PYANNOTE_TOKEN your_hf_token\n"
+                    "یا setx HUGGINGFACE_TOKEN your_hf_token\n"
+                )
+            
+            try:
+                from pyannote.audio import Pipeline
+            except Exception as e:
+                return False, (
+                    "Pyannote Error: پکیج pyannote نصب نیست یا مشکل دارد.\n\n"
+                    "نصب پیشنهادی (CPU):\n"
+                    "  pip install pyannote.audio torch --index-url https://download.pytorch.org/whl/cpu\n"
+                    f"جزئیات: {e}"
+                )
+            
+            self.status.emit("در حال دانلود وزن‌ها از HuggingFace...")
+            self.progress.emit(40)
+            
+            try:
+                pipeline = Pipeline.from_pretrained("pyannote/speaker-diarization-3.1", use_auth_token=token)
+            except Exception as e:
+                return False, f"Pyannote Error: {e}"
+            
+            # اجرای کوتاه dry run برای کش
+            self.status.emit("در حال تکمیل کش مدل...")
+            self.progress.emit(80)
+            
+            # هیچ اجرای صوتی لازم نیست؛ صرفاً ساخت pipeline کافیست
+            self.progress.emit(100)
+            self.status.emit("pyannote آماده است")
+            return True, "مدل pyannote با موفقیت آماده شد"
+        except Exception as e:
+            return False, f"Pyannote Error: {str(e)}"
     
     def _clean_corrupted_cache(self, model_name):
         """پاک کردن cache خراب مدل"""
@@ -2085,6 +2239,9 @@ class ModelSelectionDialog(QDialog):
             ("hf_whisper_large", "✅ Whisper Large HF - بالاترین دقت (3.1 GB)", "both", "offline"),
             ("hf_whisper_large_v2", "✅ Whisper Large V2 HF - جدیدترین نسخه (3.1 GB)", "both", "offline"),
             ("hf_whisper_large_v3", "✅ Whisper Large V3 HF - جدیدترین نسخه (3.1 GB)", "both", "offline"),
+            ("hf_whisper_large_persian_steja", "✅ Whisper Large Persian Steja - بهینه برای فارسی (3.1 GB)", "persian", "offline"),
+            ("pyannote_diarization", "🔑 نیاز به HuggingFace Token (pyannote) - ~1.6 GB", "both", "offline"),
+            ("coqui_xtts_v2", "🎙️ برای خروجی فارسی مناسب است (نیاز به فضای دیسک) - ~1.8 GB", "persian", "offline"),
             
             # SpeechRecognition (آنلاین)
             ("speechrecognition_google", "🌐 Google Speech - رایگان 60دقیقه/ماه (آنلاین)", "both", "online"),
@@ -2801,6 +2958,10 @@ class TranscribeThread(QThread):
     def transcribe_with_huggingface(self, audio_file):
         """تبدیل صوت به متن با Hugging Face Transformers"""
         try:
+            # جلوگیری از استفاده مدل‌های غیر STT
+            if getattr(self, "model_name", "").lower() == "coqui_xtts_v2":
+                return "TTS Error: مدل انتخاب‌شده برای متن‌به‌گفتار است، نه گفتاربه‌متن. لطفاً یک مدل STT انتخاب کنید."
+            
             # بارگذاری مدل بر اساس نوع
             model_name = None
             if self.model_name == "hf_wav2vec2_persian":
@@ -2827,6 +2988,10 @@ class TranscribeThread(QThread):
                 model_name = "openai/whisper-large-v2"
             elif self.model_name == "hf_whisper_large_v3":
                 model_name = "openai/whisper-large-v3"
+            elif self.model_name == "hf_whisper_large_v3":
+                model_name = "openai/whisper-large-v3"
+            elif self.model_name == "hf_whisper_large_persian_steja":
+                model_name = "steja/whisper-large-persian"
             else:
                 return f"Hugging Face Error: مدل {self.model_name} پشتیبانی نمی‌شود"
             
@@ -2860,13 +3025,20 @@ class TranscribeThread(QThread):
                     # پردازش برای مدل‌های Whisper
                     inputs = processor(audio, sampling_rate=sr, return_tensors="pt")
                     
+                    # تنظیم اجباری زبان فارسی و حالت transcribe برای بهبود دقت
+                    try:
+                        forced_ids = processor.get_decoder_prompt_ids(language="fa", task="transcribe")
+                    except Exception:
+                        forced_ids = None
+                    
                     # تشخیص
                     with torch.no_grad():
                         generated_ids = model.generate(
                             inputs.input_features,
                             max_length=448,
                             num_beams=5,
-                            early_stopping=True
+                            early_stopping=True,
+                            forced_decoder_ids=forced_ids
                         )
                     
                     # تبدیل به متن
@@ -3388,6 +3560,185 @@ set API_KEY_NAME=your_key_here
             
         except Exception as e:
             return f"Iranian Service Error: {str(e)}"
+
+    def diarize_with_pyannote(self, audio_file):
+        """شناسايی گویندگان با pyannote (نیازمند HF_TOKEN)
+        - متغیر محیطی: HUGGINGFACE_TOKEN یا PYANNOTE_TOKEN
+        - هندل خطا: کمبود حافظه، نبود توکن، مشکل فرمت صوت
+        """
+        try:
+            import os
+            hf_token = os.getenv("PYANNOTE_TOKEN") or os.getenv("HUGGINGFACE_TOKEN") or os.getenv("HF_TOKEN")
+            if not hf_token:
+                return (
+                    "Pyannote Error: نیاز به Token\n\n"
+                    "لطفاً یکی از متغیرهای محیطی را تنظیم کنید:\n"
+                    "  set PYANNOTE_TOKEN=your_hf_token\n"
+                    "یا set HUGGINGFACE_TOKEN=your_hf_token\n"
+                )
+            
+            # بارگذاری مدل
+            try:
+                from pyannote.audio import Pipeline
+                pipeline = Pipeline.from_pretrained(
+                    "pyannote/speaker-diarization-3.1",
+                    use_auth_token=hf_token
+                )
+            except Exception as e:
+                return f"Pyannote Error: خطا در بارگذاری مدل: {str(e)}"
+            
+            # اجرای دیاریزیشن
+            try:
+                diarization = pipeline(audio_file)
+            except Exception as e:
+                err = str(e).lower()
+                if "cuda" in err or "gpu" in err or "out of memory" in err:
+                    return (
+                        f"Pyannote Error: مشکل منابع GPU/حافظه: {e}\n\n"
+                        "راه‌حل‌ها:\n"
+                        "1) روی CPU اجرا کنید: set CUDA_VISIBLE_DEVICES=\n"
+                        "2) فایل صوتی را کوتاه‌تر کنید\n"
+                        "3) نرخ نمونه 16kHz و mono\n"
+                    )
+                return f"Pyannote Error: {e}"
+            
+            # خروجی ساده شده به صورت لیست سگمنت‌ها
+            segments = []
+            for turn, _, speaker in diarization.itertracks(yield_label=True):
+                segments.append({
+                    "start": round(turn.start, 2),
+                    "end": round(turn.end, 2),
+                    "speaker": speaker
+                })
+            
+            if not segments:
+                return "Pyannote: هیچ گوینده‌ای تشخیص داده نشد"
+            
+            # تبدیل به متن قابل خواندن
+            lines = []
+            for s in segments:
+                lines.append(f"[{s['start']}-{s['end']}] {s['speaker']}")
+            return "\n".join(lines)
+        except ImportError:
+            return (
+                "Pyannote Error: بسته pyannote نصب نیست. نصب کنید:\n"
+                "  pip install pyannote.audio torch --index-url https://download.pytorch.org/whl/cpu\n"
+            )
+        except Exception as e:
+            return f"Pyannote Error: {str(e)}"
+
+    def tts_with_xtts(self, text, speaker_wav_path=None, language="fa", out_path=None):
+        """متن به گفتار فارسی با Coqui XTTS v2
+        - language پیش‌فرض fa
+        - امکان cloning سبک با یک فایل گوینده
+        - خروجی WAV در out_path (اگر None باشد، در کنار برنامه ذخیره می‌شود)
+        """
+        try:
+            import os
+            from datetime import datetime
+            
+            try:
+                from TTS.api import TTS
+            except ImportError:
+                #Fallback به edge-tts در صورت نبود Coqui
+                return self.tts_with_edge_tts(text=text, out_path=out_path)
+            
+            model_name = "coqui/XTTS-v2"
+            
+            # مسیر خروجی
+            if out_path is None:
+                stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+                out_path = os.path.abspath(f"tts-fa-{stamp}.wav")
+            
+            # بارگذاری مدل با CPU به‌صورت امن
+            try:
+                tts = TTS(model_name)
+            except Exception as e:
+                # تلاش دوم روی CPU صریح
+                try:
+                    tts = TTS(model_name, gpu=False)
+                except Exception:
+                    #Fallback به edge-tts در صورت خطا
+                    return self.tts_with_edge_tts(text=text, out_path=out_path)
+            
+            # تولید گفتار
+            try:
+                if speaker_wav_path and os.path.exists(speaker_wav_path):
+                    tts.tts_to_file(
+                        text=text,
+                        file_path=out_path,
+                        speaker_wav=speaker_wav_path,
+                        language=language
+                    )
+                else:
+                    tts.tts_to_file(
+                        text=text,
+                        file_path=out_path,
+                        language=language
+                    )
+            except Exception as e:
+                err = str(e).lower()
+                if "cuda" in err or "gpu" in err or "out of memory" in err:
+                    return (
+                        f"TTS Error: مشکل GPU/حافظه: {e}\n\n"
+                        "راه‌حل‌ها:\n"
+                        "1) از CPU استفاده کنید یا مدل را یکبار بارگذاری کرده نگه دارید\n"
+                        "2) متن را کوتاه‌تر کنید\n"
+                        "3) فضای دیسک کافی برای کش مدل فراهم کنید\n"
+                    )
+                # در سایر خطاها هم fallback آنلاین را امتحان کن
+                return self.tts_with_edge_tts(text=text, out_path=out_path)
+            
+            return out_path
+        except Exception as e:
+            # آخرین راه: تلاش با edge-tts
+            try:
+                return self.tts_with_edge_tts(text=text, out_path=out_path)
+            except Exception:
+                return f"TTS Error: {str(e)}"
+    
+    def tts_with_edge_tts(self, text, voice="fa-IR-FaridNeural", rate="+0%", volume="+0%", out_path=None):
+        """TTS آنلاین با edge-tts (مایکروسافت) - مناسب Python 3.12
+        خروجی mp3 تولید می‌کند. اگر out_path تهی باشد، فایل mp3 با نام زمان‌دار ذخیره می‌شود.
+        """
+        try:
+            import os
+            from datetime import datetime
+            try:
+                import asyncio
+                import edge_tts
+            except ImportError:
+                return (
+                    "TTS Error: edge-tts نصب نیست. نصب کنید:\n"
+                    "  pip install edge-tts\n"
+                )
+            
+            if out_path is None:
+                stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+                out_path = os.path.abspath(f"tts-fa-{stamp}.mp3")
+            else:
+                # اطمینان از پسوند mp3
+                if not out_path.lower().endswith(".mp3"):
+                    out_path = os.path.splitext(out_path)[0] + ".mp3"
+            
+            async def _synthesize_async():
+                communicate = edge_tts.Communicate(text=text, voice=voice, rate=rate, volume=volume)
+                await communicate.save(out_path)
+            
+            try:
+                # اجرای امن event loop جداگانه
+                loop = asyncio.new_event_loop()
+                try:
+                    loop.run_until_complete(_synthesize_async())
+                finally:
+                    loop.close()
+            except RuntimeError:
+                # اگر درون loop هستیم، از asyncio.run استفاده کن
+                asyncio.run(_synthesize_async())
+            
+            return out_path
+        except Exception as e:
+            return f"edge-tts Error: {str(e)}"
 
 
 class VoiceApp(QWidget):

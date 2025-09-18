@@ -1,9 +1,9 @@
 {
-  "selected_model": "silero_stt_multilingual",
+  "selected_model": "speechrecognition_wit",
   "last_audio_path": "C:/Users/Reza/Desktop/_ALI/02.ogg",
   "window_geometry": {
     "x": 348,
-    "y": 0,
+    "y": -62,
     "width": 1004,
     "height": 735
   },

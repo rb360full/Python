@@ -21,6 +21,7 @@ pip install scipy
 pip install huggingface_hub
 pip install PocketSphinx
 pip install omegaconf
+pip install TTS==0.22.0
 
 # Silero STT Dependencies (install in order)
 pip install omegaconf

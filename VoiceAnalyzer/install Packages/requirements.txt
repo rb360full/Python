@@ -17,3 +17,4 @@ persian-tools
 tqdm
 torch
 numpy
+TTS==0.22.0
