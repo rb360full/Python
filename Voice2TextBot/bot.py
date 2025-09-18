@@ -1,7 +1,7 @@
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 
-TOKEN = "توکن دریافتی از BotFather رو اینجا بذار"
+TOKEN = "8165964545:AAFCuFec-tXvoN0QCxQ4g0AtrFiOYuq3Vqk"
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("سلام! من آماده‌ام، برام یه ویس بفرست 🎤")
