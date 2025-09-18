@@ -1,0 +1,8 @@
+python-telegram-bot[rate-limiter]
+transformers
+torch
+torchaudio
+librosa
+soundfile
+scipy
+numpy
